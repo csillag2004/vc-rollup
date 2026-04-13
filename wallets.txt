@@ -1,0 +1,15 @@
+issuer:
+Address:     0x49e61F0b3A903d26A92CAa9d2a45778a919Ef80D
+Private key: 0x43c85fc0802ddfc213de4c30cb15e8a22ddf6938756e2b043a95a74311bb3a6d  //ez kell majd az .env-be?
+
+holder:
+Address:     0x497f3cB3B180D52a6a8AD56a026E4C3c3b9fDaA3
+Private key: 0xcff364135181027c7a4bdf91dbb68a31bf9878bf07f233bb06c727e1e91c09ee
+
+
+Deployed DID Registry:
+##### scroll-sepolia
+✅  [Success] Hash: 0x8eebdfb1f1f8dfa05b96058abca0c50033c8a225c99a7c4406be94cad51a4a83
+Contract Address: 0x6fc2bA5f13495EAdBA6a87881d0aD67134e4fCa8
+Block: 17430992
+Paid: 0.000031819063000404 ETH (2029263 gas * 0.015680108 gwei)
