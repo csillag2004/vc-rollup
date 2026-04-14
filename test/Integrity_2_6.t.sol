@@ -1,5 +1,7 @@
 pragma solidity ^0.8.24;
 
+//DID?? - DID ell kell a CredDefRegistrybe
+
 import {Test} from "forge-std/Test.sol";
 import {SchemaRegistry} from "../src/SchemaRegistry.sol";
 import {CredDefRegistry} from "../src/CredDefRegistry.sol";
