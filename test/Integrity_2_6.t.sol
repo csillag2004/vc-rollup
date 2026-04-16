@@ -5,6 +5,7 @@ pragma solidity ^0.8.24;
 import {Test} from "forge-std/Test.sol";
 import {SchemaRegistry} from "../src/SchemaRegistry.sol";
 import {CredDefRegistry} from "../src/CredDefRegistry.sol";
+import {console} from "forge-std/Test.sol";
 
 contract Integrity is Test{
     SchemaRegistry public schemaRegistry;
@@ -29,7 +30,7 @@ contract Integrity is Test{
         string memory version = string(abi.encodePacked("v-", vm.toString(block.timestamp)));
         bytes32 schema_id = schemaRegistry.registerSchema("UniversityDegree", version, attributes);
         SchemaRegistry.Schema memory s = schemaRegistry.getSchema(schema_id);
-        
+
         //CredDef Registry
         bytes32 creddef_id = credDefRegistry.registerCredDef(schema_id, "default", pk);
         CredDefRegistry.CredDef memory c = credDefRegistry.getCredDef(creddef_id);
