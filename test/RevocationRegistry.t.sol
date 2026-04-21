@@ -5,7 +5,7 @@ import {SchemaRegistry} from "../src/SchemaRegistry.sol";
 import {CredDefRegistry} from "../src/CredDefRegistry.sol";
 import {RevocationRegistry} from "../src/RevocationRegistry.sol";
 
-/*contract RevocationRegistryTest is Test{
+contract RevocationRegistryTest is Test{
     SchemaRegistry public schemaRegistry;
     CredDefRegistry public credDefRegistry;
     RevocationRegistry public revocationRegistry;
@@ -28,7 +28,7 @@ import {RevocationRegistry} from "../src/RevocationRegistry.sol";
 
     function test_registerAndRead() public{
         bytes32 credDefId = credDefRegistry.registerCredDef(schemaId, "default", pk);
-        bytes32 registryId = revocationRegistry.createRegistry(credDefId, maxCredentials, initialAccumulator);
+        bytes32 registryId = revocationRegistry.createRegistry(credDefId, initialAccumulator);
         (bytes memory acc, uint256 epoch) = revocationRegistry.getRegistry(registryId);
         assertEq(keccak256(acc), keccak256(initialAccumulator));
         assertEq(epoch, 0);
@@ -38,14 +38,14 @@ import {RevocationRegistry} from "../src/RevocationRegistry.sol";
         // nem létező credDefRegistry-vel próbálkozom
         bytes32 fake_id = keccak256(abi.encodePacked("fake"));
         vm.expectRevert();
-        bytes32 registryId = revocationRegistry.createRegistry(fake_id, maxCredentials, initialAccumulator);
+        bytes32 registryId = revocationRegistry.createRegistry(fake_id, initialAccumulator);
     }
 
     function test_updateAndRead() public{
         bytes32 credDefId = credDefRegistry.registerCredDef(schemaId, "default", pk);
-        bytes32 registryId = revocationRegistry.createRegistry(credDefId, maxCredentials, initialAccumulator);
+        bytes32 registryId = revocationRegistry.createRegistry(credDefId, initialAccumulator);
         bytes memory newAccumulator = hex"87654321";
-        revocationRegistry.updateRegistry(registryId, newAccumulator, "delta");
+        revocationRegistry.updateRegistry(registryId, newAccumulator, new uint256[](2), new uint256[](3));
         (bytes memory acc, uint256 epoch) = revocationRegistry.getRegistry(registryId);
         assertEq(keccak256(acc), keccak256(newAccumulator));
         assertEq(epoch, 1);
@@ -53,21 +53,12 @@ import {RevocationRegistry} from "../src/RevocationRegistry.sol";
 
     function test_epochIncrements() public{
         bytes32 credDefId = credDefRegistry.registerCredDef(schemaId, "default", pk);
-        bytes32 registryId = revocationRegistry.createRegistry(credDefId, maxCredentials, initialAccumulator);
-        revocationRegistry.updateRegistry(registryId, "acc1", "delta1");
-        revocationRegistry.updateRegistry(registryId, "acc2", "delta2");
+        bytes32 registryId = revocationRegistry.createRegistry(credDefId, initialAccumulator);
+        revocationRegistry.updateRegistry(registryId, "acc1", new uint256[](2), new uint256[](3));
+        revocationRegistry.updateRegistry(registryId, "acc2", new uint256[](4), new uint256[](5));
         (bytes memory acc, uint256 epoch) = revocationRegistry.getRegistry(registryId);
         assertEq(keccak256(acc), keccak256("acc2"));
         assertEq(epoch, 2);
-    }
-
-    function test_getDelta() public{
-        bytes32 credDefId = credDefRegistry.registerCredDef(schemaId, "default", pk);
-        bytes32 registryId = revocationRegistry.createRegistry(credDefId, maxCredentials, initialAccumulator);
-        revocationRegistry.updateRegistry(registryId, "acc1", "delta1");
-        revocationRegistry.updateRegistry(registryId, "acc2", "delta2");
-        bytes memory delta = revocationRegistry.getDelta(registryId, 1);
-        assertEq(keccak256(delta), keccak256("delta1"));
     }
 
     function test_registryCreatedEvent() public {
@@ -76,21 +67,21 @@ import {RevocationRegistry} from "../src/RevocationRegistry.sol";
         bytes32 expectedRegistryId = keccak256(abi.encodePacked(address(this), credDefId));
 
         vm.expectEmit(true, true, true, false);
-        emit RevocationRegistry.RegistryCreated(expectedRegistryId, credDefId, address(this));
+        emit RevocationRegistry.RegistryCreated(expectedRegistryId, credDefId, address(this), initialAccumulator);
 
-        revocationRegistry.createRegistry(credDefId, maxCredentials, initialAccumulator);
+        revocationRegistry.createRegistry(credDefId, initialAccumulator);
     }
 
     function test_updatedRegistryEvent() public {
         bytes32 credDefId = credDefRegistry.registerCredDef(schemaId, "default", pk);
-        bytes32 registryId = revocationRegistry.createRegistry(credDefId, maxCredentials, initialAccumulator);
+        bytes32 registryId = revocationRegistry.createRegistry(credDefId, initialAccumulator);
 
         bytes memory newAccumulator = "acc1";
         bytes memory delta = "delta1";
 
         vm.expectEmit(true, true, true, false);
-        emit RevocationRegistry.UpdatedRegistry(registryId, 1, newAccumulator, delta);
+        emit RevocationRegistry.UpdatedRegistry(registryId, 1, newAccumulator, new uint256[](2), new uint256[](3));
 
-        revocationRegistry.updateRegistry(registryId, newAccumulator, delta);
+        revocationRegistry.updateRegistry(registryId, newAccumulator, new uint256[](2), new uint256[](3));
     }
-}*/
+}
