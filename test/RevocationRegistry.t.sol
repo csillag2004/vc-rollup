@@ -12,7 +12,7 @@ contract RevocationRegistryTest is Test{
     bytes32 public schemaId;
     bytes public pk = hex"aabbccdd1122334455";
     bytes public initialAccumulator = hex"12345678";
-    uint256 public maxCredentials = 1000;
+    //uint256 public maxCredentials = 1000;
 
     function setUp() public{
         schemaRegistry = new SchemaRegistry();

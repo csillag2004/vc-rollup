@@ -15,6 +15,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@docknetwork/crypto-wasm-ts": "^0.67.0",
     "@mattrglobal/bbs-signatures": "^2.0.0",
     "did-resolver": "^4.1.0",
     "dotenv": "^17.3.1",

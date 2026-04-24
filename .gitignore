@@ -14,3 +14,5 @@ docs/
 .env
 
 .wallets.txt
+
+/node_modules
