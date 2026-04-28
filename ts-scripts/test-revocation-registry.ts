@@ -7,6 +7,8 @@ import {
   initializeWasm,
   PositiveAccumulator,
   Accumulator,
+  //  InMemoryState
+  
 } from '@docknetwork/crypto-wasm-ts';
 
 function bytesToHex(bytes: Uint8Array): string {
@@ -95,14 +97,48 @@ async function main() {
     const m2 = Accumulator.encodePositiveNumberAsAccumulatorMember(myMap.get('cred2')!);
     const m3 = Accumulator.encodePositiveNumberAsAccumulatorMember(myMap.get('cred3')!);
 
+    //m1
     await accumulator.addBatch([m1], keypair.secretKey, state);
     console.log("Accumulator after adding cred1: ", bytesToHex(accumulator.accumulated));
 
-    const revupTx=await revocationRegistryContract.updateRegistry!(registryId, bytesToHex(accumulator.accumulated), [myMap.get('cred1')!], []);
-    const revupReceipt = await revupTx.wait();
-    const revupEvent = revocationRegistryContract.interface.parseLog(revupReceipt?.logs[0]!);
-    const newAcc = revupEvent?.args[2];
-    console.log("Updated registry with new accumulator: ", newAcc);
+    const revup1Tx=await revocationRegistryContract.updateRegistry!(registryId, bytesToHex(accumulator.accumulated), [myMap.get('cred1')!], []);
+    const revup1Receipt = await revup1Tx.wait();
+    const revup1Event = revocationRegistryContract.interface.parseLog(revup1Receipt?.logs[0]!);
+    const new1Acc = revup1Event?.args[2];
+    console.log("Updated registry with new accumulator: ", new1Acc);
+
+    //m2
+    await accumulator.addBatch([m2], keypair.secretKey, state);
+    console.log("Accumulator after adding cred2: ", bytesToHex(accumulator.accumulated));
+
+    const revup2Tx=await revocationRegistryContract.updateRegistry!(registryId, bytesToHex(accumulator.accumulated), [myMap.get('cred1')!], []);
+    const revup2Receipt = await revup2Tx.wait();
+    const revup2Event = revocationRegistryContract.interface.parseLog(revup2Receipt?.logs[0]!);
+    const new2Acc = revup2Event?.args[2];
+    console.log("Updated registry with new accumulator: ", new2Acc);
+
+    //m3
+    await accumulator.addBatch([m3], keypair.secretKey, state);
+    console.log("Accumulator after adding cred3: ", bytesToHex(accumulator.accumulated));
+
+    const revup3Tx=await revocationRegistryContract.updateRegistry!(registryId, bytesToHex(accumulator.accumulated), [myMap.get('cred1')!], []);
+    const revup3Receipt = await revup3Tx.wait();
+    const revup3Event = revocationRegistryContract.interface.parseLog(revup3Receipt?.logs[0]!);
+    const new3Acc = revup3Event?.args[2];
+    console.log("Updated registry with new accumulator: ", new3Acc);
+
+    //6. revoke credential (cred2)
+    await accumulator.removeBatch([m2], keypair.secretKey, state);
+    console.log("Accumulator after revoking cred2: ", bytesToHex(accumulator.accumulated));
+
+    const revRevokeTx=await revocationRegistryContract.updateRegistry!(registryId, bytesToHex(accumulator.accumulated), [], [myMap.get('cred2')!]);
+    const revRevokeReceipt = await revRevokeTx.wait();
+    const revRevokeEvent = revocationRegistryContract.interface.parseLog(revRevokeReceipt?.logs[0]!);
+    const revokedAcc = revRevokeEvent?.args[2];
+    console.log("Updated registry with new accumulator after revocation cred2: ", revokedAcc);
+
+
+    ///const inAcc = await state.has(myMap.get('cred1')!);
 }
 
 
