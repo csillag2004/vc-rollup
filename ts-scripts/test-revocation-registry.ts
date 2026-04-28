@@ -17,8 +17,9 @@ import {
   Statements,
   WitnessEqualityMetaStatement,
   MetaStatement,
-  BBSPlusBlindSignature
-  
+  BBSPlusKeypairG2,
+  BBSPlusSignatureParamsG1,
+  BBSPlusSignatureG1,
 } from '@docknetwork/crypto-wasm-ts';
 
 function bytesToHex(bytes: Uint8Array): string {
@@ -77,7 +78,7 @@ async function main() {
     console.log("Initial accumulator:", bytesToHex(accumulator.accumulated));
 
     //2. schemaIdk létrehozása
-    const attributes = ['studentName', 'university', 'degree', 'graduationYear'];
+    const attributes = ['studentName', 'university', 'degree', 'graduationYear', 'revocationId'];
     const random = Math.floor(Math.random() * 100000);
     const version = "1.0-" + random; //minden futtatásnál új verzió, hogy ne ütközzön a már regisztrált sémákkal
     const schemaTx = await schemaRegistryContract.registerSchema!("UniversityDegree", version, attributes);
@@ -184,44 +185,90 @@ async function main() {
     //MAJD WITNESS UPDATE KELL
 
 
-    //8. proof for m1
-    const witnesses = new Witnesses();
-    if (w1){
-            witnesses.add(w1);
+    //8. BBS+ setup + sign cred1
+    //    The BBS+ message at slot K_HANDLE must be the SAME field element
+    //    as the accumulator member m1 — that's what the witness-equality
+    //    MetaStatement binds together. We pre-encode all messages and pass
+    //    `false` to BBS+ so it doesn't re-encode them.
+    const MESSAGE_COUNT = 5;
+    const K_HANDLE = 4;
+
+    const sigParams = BBSPlusSignatureParamsG1.generate(
+        MESSAGE_COUNT,
+        stringToBytes('issuer-sig-params-v1'),
+    );
+    const issuerKp = BBSPlusKeypairG2.generate(sigParams);
+    const issuerSk = issuerKp.secretKey;
+    const issuerPk = issuerKp.publicKey;
+
+    const encB = (s: string) => Accumulator.encodeBytesAsAccumulatorMember(stringToBytes(s));
+    const cred1Messages: Uint8Array[] = [
+        encB('Alice'),       // 0: studentName
+        encB('Budapest U'),  // 1: university
+        encB('BSc'),         // 2: degree
+        encB('2026'),        // 3: graduationYear
+        m1,                  // 4: revocationId  ← K_HANDLE (same bytes as acc member)
+    ];
+    const sig1 = BBSPlusSignatureG1.generate(cred1Messages, issuerSk, sigParams, false);
+
+    if (!w1 || !witness1) {
+        throw new Error('cred1 membership witness is not available — cannot build proof');
     }
-    console.log("Witnesses added to the proof: ", witnesses.values.length);
+
+    //9. Build composite proof for cred1
+    const REVEAL = new Set<number>([2, 3]); // reveal degree + graduationYear
+    const revealedMsgs = new Map<number, Uint8Array>();
+    const unrevealedMsgs = new Map<number, Uint8Array>();
+    cred1Messages.forEach((m, i) =>
+        REVEAL.has(i) ? revealedMsgs.set(i, m) : unrevealedMsgs.set(i, m),
+    );
 
     const provingKey = Accumulator.generateMembershipProvingKey(stringToBytes('Our proving key'));
 
-    const statement1 = Statement.vbAccumulatorMembership(
-        params,                  
-        keypair.publicKey,       
-        provingKey,              
-        accumulator.accumulated  
+    const proverStmts = new Statements();
+    const sBBS = proverStmts.add(
+        Statement.bbsPlusSignatureProverConstantTime(sigParams, revealedMsgs, false),
+    );
+    const sAcc = proverStmts.add(
+        Statement.vbAccumulatorMembership(
+            params, keypair.publicKey, provingKey, accumulator.accumulated,
+        ),
     );
 
-    paramsBBS = BBSPlusBlindSignature.generateParams(stringToBytes('BBS+ signature params for revocation registry test'));
-    const statement2 = Statement.bbsPlusSignatureProverConstantTime(
-
-    const statements = new Statements();
-    statements.add(statement);
-    console.log("Statements added to the proof: ", statements);
-
+    const eq = new WitnessEqualityMetaStatement();
+    eq.addWitnessRef(sBBS, K_HANDLE);
+    eq.addWitnessRef(sAcc, 0);
     const metaStatements = new MetaStatements();
-    const proofSpec = new ProofSpec(statements, metaStatements);
+    metaStatements.add(MetaStatement.witnessEquality(eq));
 
+    const witnesses = new Witnesses();
+    witnesses.add(Witness.bbsPlusSignatureConstantTime(sig1, unrevealedMsgs, false));
+    witnesses.add(w1);
 
-    console.log("Witnesses added to the proof: ", witnesses.values.length);
-    console.log("Statements added to the proof: ", statements.values.length);
-
+    const proofSpec = new ProofSpec(proverStmts, metaStatements);
     const nonce = stringToBytes('nonce1');
     const proof = CompositeProof.generate(proofSpec, witnesses, nonce);
-    console.log("Generated proof for cred1: ", proof);
+    console.log("Generated proof for cred1.");
 
-    //9. proof verification
-    const isValid = proof.verify(proofSpec,  nonce);
+    //10. Verifier rebuilds statements + metastatements (no witnesses, no signature)
+    const verStmts = new Statements();
+    verStmts.add(
+        Statement.bbsPlusSignatureVerifierConstantTime(sigParams, issuerPk, revealedMsgs, false),
+    );
+    verStmts.add(
+        Statement.vbAccumulatorMembership(
+            params, keypair.publicKey, provingKey, accumulator.accumulated,
+        ),
+    );
+    const eqV = new WitnessEqualityMetaStatement();
+    eqV.addWitnessRef(0, K_HANDLE);
+    eqV.addWitnessRef(1, 0);
+    const metaStmtsV = new MetaStatements();
+    metaStmtsV.add(MetaStatement.witnessEquality(eqV));
+    const verifierSpec = new ProofSpec(verStmts, metaStmtsV);
+
+    const isValid = proof.verify(verifierSpec, nonce);
     console.log("Proof verification result for cred1: ", isValid);
-
 }
 
 
