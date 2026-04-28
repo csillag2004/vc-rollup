@@ -138,7 +138,29 @@ async function main() {
     console.log("Updated registry with new accumulator after revocation cred2: ", revokedAcc);
 
 
-    ///const inAcc = await state.has(myMap.get('cred1')!);
+    //7. witness
+    try {
+        const witness1 = await accumulator.membershipWitness(m1, keypair.secretKey, state);
+        console.log("Membership witness for cred1: ", witness1);
+    } catch (e) {
+        console.log("cred1 is revoked, cannot generate witness");
+    }
+    
+    try {        
+        const witness2 = await accumulator.membershipWitness(m2, keypair.secretKey, state);
+        console.log("Membership witness for cred2: ", witness2);
+    } catch (e) {
+        console.log("cred2 is revoked, cannot generate witness");
+    }
+
+    
+    try {
+        const witness3 = await accumulator.membershipWitness(m3, keypair.secretKey, state);
+        console.log("Membership witness for cred3: ", witness3);
+    } catch (e) {
+        console.log("cred3 is revoked, cannot generate witness");
+
+    }
 }
 
 
