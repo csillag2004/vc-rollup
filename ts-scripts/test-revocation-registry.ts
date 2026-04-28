@@ -16,7 +16,8 @@ import {
   Statement,
   Statements,
   WitnessEqualityMetaStatement,
-  MetaStatement
+  MetaStatement,
+  BBSPlusBlindSignature
   
 } from '@docknetwork/crypto-wasm-ts';
 
@@ -148,12 +149,12 @@ async function main() {
 
 
     //7. witness
-    let witness1: any = null;
-    let witness2: any = null;
-    let witness3: any = null; 
-    let w1: any = null;
-    let w2: any = null;
-    let w3: any = null;
+    let witness1; //legyen igazi type
+    let witness2;
+    let witness3; 
+    let w1;
+    let w2;
+    let w3;
     try {
         witness1 = await accumulator.membershipWitness(m1, keypair.secretKey, state);
         w1 = Witness.vbAccumulatorMembership(m1, witness1);
@@ -192,27 +193,21 @@ async function main() {
 
     const provingKey = Accumulator.generateMembershipProvingKey(stringToBytes('Our proving key'));
 
-    const statement = Statement.vbAccumulatorMembership(
+    const statement1 = Statement.vbAccumulatorMembership(
         params,                  
         keypair.publicKey,       
         provingKey,              
         accumulator.accumulated  
     );
 
+    paramsBBS = BBSPlusBlindSignature.generateParams(stringToBytes('BBS+ signature params for revocation registry test'));
+    const statement2 = Statement.bbsPlusSignatureProverConstantTime(
+
     const statements = new Statements();
     statements.add(statement);
     console.log("Statements added to the proof: ", statements);
 
-    //-------
-    const witnessEq = new WitnessEqualityMetaStatement();
-    witnessEq.addWitnessRef(0, 2);          // accumulator statement, member
-    const ms = MetaStatement.witnessEquality(witnessEq);
-
     const metaStatements = new MetaStatements();
-    metaStatements.add(ms);
-    //-------
-
-    //const ms = new MetaStatements();
     const proofSpec = new ProofSpec(statements, metaStatements);
 
 
