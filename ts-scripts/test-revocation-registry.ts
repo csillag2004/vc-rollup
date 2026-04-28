@@ -8,6 +8,13 @@ import {
   PositiveAccumulator,
   Accumulator,
   //  InMemoryState
+  CompositeProof,
+  Witness,
+  Witnesses,
+  ProofSpec, 
+  MetaStatements,
+  Statement,
+  Statements
   
 } from '@docknetwork/crypto-wasm-ts';
 
@@ -111,7 +118,7 @@ async function main() {
     await accumulator.addBatch([m2], keypair.secretKey, state);
     console.log("Accumulator after adding cred2: ", bytesToHex(accumulator.accumulated));
 
-    const revup2Tx=await revocationRegistryContract.updateRegistry!(registryId, bytesToHex(accumulator.accumulated), [myMap.get('cred1')!], []);
+    const revup2Tx=await revocationRegistryContract.updateRegistry!(registryId, bytesToHex(accumulator.accumulated), [myMap.get('cred2')!], []);
     const revup2Receipt = await revup2Tx.wait();
     const revup2Event = revocationRegistryContract.interface.parseLog(revup2Receipt?.logs[0]!);
     const new2Acc = revup2Event?.args[2];
@@ -121,7 +128,7 @@ async function main() {
     await accumulator.addBatch([m3], keypair.secretKey, state);
     console.log("Accumulator after adding cred3: ", bytesToHex(accumulator.accumulated));
 
-    const revup3Tx=await revocationRegistryContract.updateRegistry!(registryId, bytesToHex(accumulator.accumulated), [myMap.get('cred1')!], []);
+    const revup3Tx=await revocationRegistryContract.updateRegistry!(registryId, bytesToHex(accumulator.accumulated), [myMap.get('cred3')!], []);
     const revup3Receipt = await revup3Tx.wait();
     const revup3Event = revocationRegistryContract.interface.parseLog(revup3Receipt?.logs[0]!);
     const new3Acc = revup3Event?.args[2];
@@ -139,15 +146,23 @@ async function main() {
 
 
     //7. witness
+    let witness1: any = null;
+    let witness2: any = null;
+    let witness3: any = null; 
+    let w1: any = null;
+    let w2: any = null;
+    let w3: any = null;
     try {
-        const witness1 = await accumulator.membershipWitness(m1, keypair.secretKey, state);
+        witness1 = await accumulator.membershipWitness(m1, keypair.secretKey, state);
+        w1 = Witness.vbAccumulatorMembership(m1, witness1);
         console.log("Membership witness for cred1: ", witness1);
     } catch (e) {
         console.log("cred1 is revoked, cannot generate witness");
     }
     
     try {        
-        const witness2 = await accumulator.membershipWitness(m2, keypair.secretKey, state);
+        witness2 = await accumulator.membershipWitness(m2, keypair.secretKey, state);
+        w2 = Witness.vbAccumulatorMembership(m2, witness2);
         console.log("Membership witness for cred2: ", witness2);
     } catch (e) {
         console.log("cred2 is revoked, cannot generate witness");
@@ -155,12 +170,82 @@ async function main() {
 
     
     try {
-        const witness3 = await accumulator.membershipWitness(m3, keypair.secretKey, state);
+        witness3 = await accumulator.membershipWitness(m3, keypair.secretKey, state);
+        w3 = Witness.vbAccumulatorMembership(m3, witness3);
         console.log("Membership witness for cred3: ", witness3);
     } catch (e) {
         console.log("cred3 is revoked, cannot generate witness");
 
     }
+
+    //MAJD WITNESS UPDATE KELL
+
+
+    //8. proof for m1
+    const witnesses = new Witnesses();
+    if (w1){
+            witnesses.add(w1);
+    }
+    console.log("Witnesses added to the proof: ", witnesses.values.length);
+
+    const provingKey = Accumulator.generateMembershipProvingKey(stringToBytes('Our proving key'));
+
+    const statement = Statement.vbAccumulatorMembership(
+        params,                  
+        keypair.publicKey,       
+        provingKey,              
+        accumulator.accumulated  
+    );
+
+    const statements = new Statements();
+    statements.add(statement);
+
+
+    const ms = new MetaStatements();
+    const proofSpec = new ProofSpec(statements, ms);
+
+
+    console.log("Witnesses added to the proof: ", witnesses.values.length);
+    console.log("Statements added to the proof: ", statements.values.length);
+
+    const nonce = stringToBytes('nonce1');
+    const proof = CompositeProof.generate(proofSpec, witnesses, nonce);
+    console.log("Generated proof for cred1: ", proof);
+
+    //9. proof verification
+    const isValid = proof.verify(proofSpec,  nonce);
+    console.log("Proof verification result for cred1: ", isValid);
+
+
+
+
+    // 1. A nyers MembershipWitness — megjött-e rendesen?
+console.log('--- DIAG 1: witness1 raw ---');
+console.log('  type:', witness1?.constructor?.name);
+console.log('  keys:', Object.keys(witness1 || {}));
+console.log('  has .value?:', witness1?.value !== undefined);
+console.log('  value length:', witness1?.value?.length);
+
+// 2. A wrapped Witness — mi lett belőle a Witness.vbAccumulatorMembership után?
+console.log('--- DIAG 2: wrapped w1 ---');
+console.log('  type:', w1?.constructor?.name);
+console.log('  keys:', Object.keys(w1 || {}));
+console.log('  full object:', w1);
+
+// 3. Mi került be a Witnesses kollekcióba?
+console.log('--- DIAG 3: witnesses collection ---');
+console.log('  values:', witnesses.values);
+console.log('  first item:', witnesses.values[0]);
+console.log('  first item type:', witnesses.values[0]?.constructor?.name);
+
+// 4. A factory függvény forráskódja — ez segít megérteni, hogy a tied verziójában mit csinál
+console.log('--- DIAG 4: factory source ---');
+console.log(Witness.vbAccumulatorMembership.toString());
+
+console.log('Statement accumulator variants:', 
+    Object.keys(Statement).filter(k => k.toLowerCase().includes('cumulator'))
+);
+
 }
 
 
