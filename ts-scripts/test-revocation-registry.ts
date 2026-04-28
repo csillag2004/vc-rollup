@@ -14,7 +14,9 @@ import {
   ProofSpec, 
   MetaStatements,
   Statement,
-  Statements
+  Statements,
+  WitnessEqualityMetaStatement,
+  MetaStatement
   
 } from '@docknetwork/crypto-wasm-ts';
 
@@ -199,10 +201,19 @@ async function main() {
 
     const statements = new Statements();
     statements.add(statement);
+    console.log("Statements added to the proof: ", statements);
 
+    //-------
+    const witnessEq = new WitnessEqualityMetaStatement();
+    witnessEq.addWitnessRef(0, 2);          // accumulator statement, member
+    const ms = MetaStatement.witnessEquality(witnessEq);
 
-    const ms = new MetaStatements();
-    const proofSpec = new ProofSpec(statements, ms);
+    const metaStatements = new MetaStatements();
+    metaStatements.add(ms);
+    //-------
+
+    //const ms = new MetaStatements();
+    const proofSpec = new ProofSpec(statements, metaStatements);
 
 
     console.log("Witnesses added to the proof: ", witnesses.values.length);
@@ -215,36 +226,6 @@ async function main() {
     //9. proof verification
     const isValid = proof.verify(proofSpec,  nonce);
     console.log("Proof verification result for cred1: ", isValid);
-
-
-
-
-    // 1. A nyers MembershipWitness — megjött-e rendesen?
-console.log('--- DIAG 1: witness1 raw ---');
-console.log('  type:', witness1?.constructor?.name);
-console.log('  keys:', Object.keys(witness1 || {}));
-console.log('  has .value?:', witness1?.value !== undefined);
-console.log('  value length:', witness1?.value?.length);
-
-// 2. A wrapped Witness — mi lett belőle a Witness.vbAccumulatorMembership után?
-console.log('--- DIAG 2: wrapped w1 ---');
-console.log('  type:', w1?.constructor?.name);
-console.log('  keys:', Object.keys(w1 || {}));
-console.log('  full object:', w1);
-
-// 3. Mi került be a Witnesses kollekcióba?
-console.log('--- DIAG 3: witnesses collection ---');
-console.log('  values:', witnesses.values);
-console.log('  first item:', witnesses.values[0]);
-console.log('  first item type:', witnesses.values[0]?.constructor?.name);
-
-// 4. A factory függvény forráskódja — ez segít megérteni, hogy a tied verziójában mit csinál
-console.log('--- DIAG 4: factory source ---');
-console.log(Witness.vbAccumulatorMembership.toString());
-
-console.log('Statement accumulator variants:', 
-    Object.keys(Statement).filter(k => k.toLowerCase().includes('cumulator'))
-);
 
 }
 
