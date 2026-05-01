@@ -20,6 +20,7 @@ import {
   BBSPlusKeypairG2,
   BBSPlusSignatureParamsG1,
   BBSPlusSignatureG1,
+  AccumulatorParams,
 } from '@docknetwork/crypto-wasm-ts';
 
 
@@ -36,6 +37,11 @@ let myMap = new Map<string, number>(); //it a number lesz a random y, most még 
 let schemaRegistryContract: ethers.Contract;
 let credDefRegistryContract: ethers.Contract;
 let revocationRegistryContract: ethers.Contract;
+
+let accumulator: PositiveAccumulator;
+let keypair: ReturnType<typeof PositiveAccumulator.generateKeypair>;
+let state: InMemoryState;
+let params: AccumulatorParams;
 
 export class Issuer {
     //private registryId?: string;
@@ -79,10 +85,10 @@ export class Issuer {
 
     async createAccumulator() {
         await initializeWasm();
-        const params = PositiveAccumulator.generateParams(this.stringToBytes('vc-rollup-thesis-accumulator-params-v1'));
-        const keypair = PositiveAccumulator.generateKeypair(params);
-        const state = new InMemoryState();
-        const accumulator = PositiveAccumulator.initialize(params);
+        params = PositiveAccumulator.generateParams(this.stringToBytes('vc-rollup-thesis-accumulator-params-v1'));
+        keypair = PositiveAccumulator.generateKeypair(params);
+        state = new InMemoryState();
+        accumulator = PositiveAccumulator.initialize(params);
         console.log("Initial accumulator:", this.bytesToHex(accumulator.accumulated));
         return accumulator;
     }
@@ -118,12 +124,12 @@ export class Issuer {
         return registryId;
     }
 
-    async addCredentials(credId: string, accumulator: PositiveAccumulator, keypair: ReturnType<typeof PositiveAccumulator.generateKeypair>, state: InMemoryState, cred: string, registryId: string) {
-        const m1 = Accumulator.encodePositiveNumberAsAccumulatorMember(myMap.get(cred)!);
-        await accumulator.addBatch([m1], keypair.secretKey, state);
-        console.log("Accumulator after adding " + cred + ": ", this.bytesToHex(accumulator.accumulated));
+    async addCredentials(credId: string, registryId: string) {
+        const m = Accumulator.encodePositiveNumberAsAccumulatorMember(myMap.get(credId)!);
+        await accumulator.addBatch([m], keypair.secretKey, state);
+        console.log("Accumulator after adding " + credId + ": ", this.bytesToHex(accumulator.accumulated));
 
-        const revup1Tx = await revocationRegistryContract.updateRegistry!(registryId, this.bytesToHex(accumulator.accumulated), [myMap.get(cred)!], []);
+        const revup1Tx = await revocationRegistryContract.updateRegistry!(registryId, this.bytesToHex(accumulator.accumulated), [myMap.get(credId)!], []);
         const revup1Receipt = await revup1Tx.wait();
         const revup1Event = revocationRegistryContract.interface.parseLog(revup1Receipt?.logs[0]!);
         const new1Acc = revup1Event?.args[2];
@@ -131,7 +137,7 @@ export class Issuer {
         return new1Acc;
     }
 
-    async revokeCredentials(credId: string, accumulator: PositiveAccumulator, keypair: ReturnType<typeof PositiveAccumulator.generateKeypair>, state: InMemoryState, registryId: string) {
+    async revokeCredentials(credId: string, registryId: string) {
         const m1 = Accumulator.encodePositiveNumberAsAccumulatorMember(myMap.get(credId)!);
 
         await accumulator.removeBatch([m1], keypair.secretKey, state);
@@ -145,15 +151,15 @@ export class Issuer {
         return revokedAcc;
     }
 
-    async createWitness(credId: string, accumulator: PositiveAccumulator, keypair: ReturnType<typeof PositiveAccumulator.generateKeypair>, state: InMemoryState, cred: string) {
-        const m1 = Accumulator.encodePositiveNumberAsAccumulatorMember(myMap.get(cred)!);
+    async createWitness(credId: string) {
+        const m1 = Accumulator.encodePositiveNumberAsAccumulatorMember(myMap.get(credId)!);
         try {
             const witness = await accumulator.membershipWitness(m1, keypair.secretKey, state);
             const w1 = Witness.vbAccumulatorMembership(m1, witness);
-            console.log("Membership witness for " + cred + ": ", witness);
+            console.log("Membership witness for " + credId + ": ", witness);
             return { witness, w1 };
         } catch (e) {
-            console.log(cred + " is revoked, cannot generate witness");
+            console.log(credId + " is revoked, cannot generate witness");
             return null;
         }
     }

@@ -26,26 +26,29 @@ import {
 } from '@docknetwork/crypto-wasm-ts';
 
 
-async function buildCompositeProof(sigParams: BBSPlusSignatureParamsG1, issuerPk: BBSPlusKeypairG2['publicKey'], revealedMsgs: Map<number, Uint8Array<ArrayBufferLike>>, keypair: ReturnType<typeof PositiveAccumulator.generateKeypair>, provingKey: MembershipProvingKey, accumulator: PositiveAccumulator, proof: CompositeProof, nonce: Uint8Array, params: AccumulatorParams, k_handle: number) {
+export class Verifier {
 
-    //10. Verifier rebuilds statements + metastatements (no witnesses, no signature)
-    const verStmts = new Statements();
-    verStmts.add(
-        Statement.bbsPlusSignatureVerifierConstantTime(sigParams, issuerPk, revealedMsgs, false),
-    );
-    verStmts.add(
-        Statement.vbAccumulatorMembership(
-            params, keypair.publicKey, provingKey, accumulator.accumulated,
-        ),
-    );
-    const eqV = new WitnessEqualityMetaStatement();
-    eqV.addWitnessRef(0, k_handle);
-    eqV.addWitnessRef(1, 0);
-    const metaStmtsV = new MetaStatements();
-    metaStmtsV.add(MetaStatement.witnessEquality(eqV));
-    const verifierSpec = new ProofSpec(verStmts, metaStmtsV);
+    async buildCompositeProof(sigParams: BBSPlusSignatureParamsG1, issuerPk: BBSPlusKeypairG2['publicKey'], revealedMsgs: Map<number, Uint8Array<ArrayBufferLike>>, keypair: ReturnType<typeof PositiveAccumulator.generateKeypair>, provingKey: MembershipProvingKey, accumulator: PositiveAccumulator, proof: CompositeProof, nonce: Uint8Array, params: AccumulatorParams, k_handle: number) {
 
-    const isValid = proof.verify(verifierSpec, nonce);
-    console.log("Proof verification result for cred1: ", isValid);
+        //10. Verifier rebuilds statements + metastatements (no witnesses, no signature)
+        const verStmts = new Statements();
+        verStmts.add(
+            Statement.bbsPlusSignatureVerifierConstantTime(sigParams, issuerPk, revealedMsgs, false),
+        );
+        verStmts.add(
+            Statement.vbAccumulatorMembership(
+                params, keypair.publicKey, provingKey, accumulator.accumulated,
+            ),
+        );
+        const eqV = new WitnessEqualityMetaStatement();
+        eqV.addWitnessRef(0, k_handle);
+        eqV.addWitnessRef(1, 0);
+        const metaStmtsV = new MetaStatements();
+        metaStmtsV.add(MetaStatement.witnessEquality(eqV));
+        const verifierSpec = new ProofSpec(verStmts, metaStmtsV);
+
+        const isValid = proof.verify(verifierSpec, nonce);
+        console.log("Proof verification result for cred1: ", isValid);
+    }
 }
 
