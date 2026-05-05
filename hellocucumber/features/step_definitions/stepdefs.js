@@ -49,30 +49,56 @@ Then('the {string} is issued successfully - is available in the map', function (
     assert.ok(this.issuer.getCredentialById(credId));
 });
 
-Then ('{string} is added to the accumulator"', function (credId) {
+Then('{string} is added to the accumulator', function (credId) {
     const registryId = this.issuer.getRegistryId();
     const credential = this.issuer.getCredentialById(credId);
     assert.ok(credential);
     assert.strictEqual(credential.registryId, registryId);
 });
 
-When ('save the accumulator state', function () {
+When('save the accumulator state', function () {
     this.savedAccumulatorState = new Uint8Array(this.accumulator.accumulated);
 });
 
-Then ('the accumulator is changed', function () {
+Then('the accumulator is changed', function () {
     assert.notDeepStrictEqual(this.accumulator.accumulated, this.savedAccumulatorState);
 });
     
-Then ('state has {string}', async function (credId) {
+Then('state has {string}', async function (credId) {
     assert.ok(await this.issuer.stateHas(credId));
 });
 
 //6
-Then ('the Issuer issues credential {string} again', async function (credId) {
+Then('the Issuer issues credential {string} again', async function (credId) {
     const registryId = this.issuer.getRegistryId();
     await assert.rejects(
         async () => await this.issuer.addCredentials(credId, registryId),
         { message: /already present/ }
     );
+});
+
+
+//7
+When('the Issuer revokes {string}', async function (credId) {
+    const registryId = this.issuer.getRegistryId();
+    this.accumulator = await this.issuer.revokeCredentials(credId, registryId);
+});
+
+Then('the {string} is removed successfully - is not available in the map', async function (credId) {
+    await assert.rejects(
+        async () => await this.issuer.getCredentialById(credId),
+        { message: /not found/ }
+    );
+});
+
+Then('state does not have', async function () {
+    /*await assert.rejects(
+        async () => await this.issuer.stateHas(credId),
+        { message: /not found/ }
+    );*/
+    assert.ok(!await this.issuer.stateHas_y(this.cred_y));
+});
+
+When('save the y {string}', function (credId) {
+    this.cred_y = this.issuer.getCredentialById(credId); //majd menjen mappbe
 });

@@ -65,3 +65,22 @@ Feature: Verifiable Credential issuance and proof verification
 
     Then the "cred1" is issued successfully - is available in the map
     And the Issuer issues credential "cred1" again
+
+  Scenario: 7. Revoke credential
+    Given the Issuer create an accumulator 
+    And the Issuer registers a schema with name "Degree", version "first-version" and attributes "studentName, university, degree, graduationYear" 
+    And the Issuer creates a credential definition for the registered schema
+    And the issuer creates a revocation registry for the credential definition
+    And the Issuer issues credential "cred1"
+    And the Issuer issues credential "cred2"
+    And the Issuer issues credential "cred3"
+    And save the y "cred2"
+    
+    When save the accumulator state
+    And the Issuer revokes "cred2"
+
+    Then the accumulator is changed
+    And the "cred2" is removed successfully - is not available in the map
+    And state does not have
+    And state has "cred1"
+    And state has "cred3"
