@@ -24,6 +24,7 @@ import {
   BBSPlusSignatureParamsG1,
   BBSPlusSignatureG1,
 } from '@docknetwork/crypto-wasm-ts';
+import { sign } from 'crypto';
 
 async function main() {
     const issuer = new Issuer();
@@ -55,9 +56,25 @@ async function main() {
     const witness2 = await issuer.createWitness("cred2");
     const witness3 = await issuer.createWitness("cred3");
 
+    //8. BBS+ setup + sign cred1
+    const sign = issuer.signCredential("cred1", ["Alice", "Smith", "2020", "Computer Science", "Bachelor"], witness1, 5); 
+    console.log("Credential signature created: ", sign);
 
+    //9. composite proof
+    const proof = holder.compositeProofForCredential(sign.sig1, sign.cred1Messages, sign.issuerPk, sign.sigParams, witness1!.witness, witness1!.w1, accumulator.params, sign.issuerPk, accumulator);
+    console.log("Composite proof created: ", proof);
 
+    //10. verify proof
+    /*await verifier.buildCompositeProof(sign.sigParams, 
+                                        sign.issuerPk, 
+                                        new Map<number, Uint8Array>([[2, sign.cred1Messages[2]!], [3, sign.cred1Messages[3]!]]), 
+                                        accumulator.params, 
+                                        proof, 
+                                        holder.stringToBytes('some nonce'), 
+                                        accumulator.params, 
+                                        sign.k_handler);*/
 }
 
 main().catch(console.error);
+
 

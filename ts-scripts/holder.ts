@@ -20,6 +20,7 @@ import {
   BBSPlusKeypairG2,
   BBSPlusSignatureParamsG1,
   BBSPlusSignatureG1,
+  AccumulatorPublicKey,
 } from '@docknetwork/crypto-wasm-ts';
 
 const MESSAGE_COUNT = 5;
@@ -35,7 +36,7 @@ export class Holder {
         return '0x' + Buffer.from(bytes).toString('hex');
     }
 
-    compositeProofForCredential(sig1: BBSPlusSignatureG1, cred1Messages: Uint8Array[], issuerPk: BBSPlusKeypairG2['publicKey'], sigParams: BBSPlusSignatureParamsG1, witness: Witness, w: Uint8Array<ArrayBufferLike>, params: any, keypair: { publicKey: any }, accumulator: { accumulated: any }) {
+    compositeProofForCredential(sig1: BBSPlusSignatureG1, cred1Messages: Uint8Array[], issuerPk: BBSPlusKeypairG2['publicKey'], sigParams: BBSPlusSignatureParamsG1, witness: Witness, w: Uint8Array<ArrayBufferLike>, params: any, publickey: AccumulatorPublicKey, accumulator: { accumulated: any }) {
         const REVEAL = new Set<number>([2, 3]); // reveal degree + graduationYear
         const revealedMsgs = new Map<number, Uint8Array>();
         const unrevealedMsgs = new Map<number, Uint8Array>();
@@ -51,7 +52,7 @@ export class Holder {
         );
         const sAcc = proverStmts.add(
             Statement.vbAccumulatorMembership(
-                params, keypair.publicKey, provingKey, accumulator.accumulated,
+                params, publickey, provingKey, accumulator.accumulated,
             ),
         );
 

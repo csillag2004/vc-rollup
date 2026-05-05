@@ -21,29 +21,32 @@ import {
   BBSPlusSignatureParamsG1,
   BBSPlusSignatureG1,
   AccumulatorParams,
+  VBMembershipWitness,
 } from '@docknetwork/crypto-wasm-ts';
 
 
-const RPC_URL = 'https://sepolia-rpc.scroll.io';
-const CHAIN_ID = 534351;
-const REGISTRY = process.env.REGISTRY_ADDRESS!;
-const PRIVATE_KEY = process.env.PRIVATE_KEY!;
-const CREDDEF_REGISTRY = process.env.CREDDEF_REGISTRY_ADDR!;
-const REVOCATION_REGISTRY = process.env.REVOCATION_REGISTRY_ADDR!;
-const SCHEMA_REGISTRY = process.env.SCHEMA_REGISTRY_ADDR!;
 
-let myMap = new Map<string, number>(); //it a number lesz a random y, most még nem random, csak tesztelés miatt 1-et adok neki
-
-let schemaRegistryContract: ethers.Contract;
-let credDefRegistryContract: ethers.Contract;
-let revocationRegistryContract: ethers.Contract;
-
-let accumulator: PositiveAccumulator;
-let keypair: ReturnType<typeof PositiveAccumulator.generateKeypair>;
-let state: InMemoryState;
-let params: AccumulatorParams;
 
 export class Issuer {
+    private readonly RPC_URL = 'https://sepolia-rpc.scroll.io';
+    private readonly CHAIN_ID = 534351;
+    private readonly REGISTRY = process.env.REGISTRY_ADDRESS!;
+    private readonly PRIVATE_KEY = process.env.PRIVATE_KEY!;
+    private readonly CREDDEF_REGISTRY = process.env.CREDDEF_REGISTRY_ADDR!;
+    private readonly REVOCATION_REGISTRY = process.env.REVOCATION_REGISTRY_ADDR!;
+    private readonly SCHEMA_REGISTRY = process.env.SCHEMA_REGISTRY_ADDR!;
+
+    private myMap = new Map<string, number>(); //it a number lesz a random y, most még nem random, csak tesztelés miatt 1-et adok neki
+
+    private schemaRegistryContract!: ethers.Contract;
+    private credDefRegistryContract!: ethers.Contract;
+    private revocationRegistryContract!: ethers.Contract;
+
+    private accumulator!: PositiveAccumulator;
+    private keypair!: ReturnType<typeof PositiveAccumulator.generateKeypair>;
+    private state!: InMemoryState;
+    private params!: AccumulatorParams;
+
     //private registryId?: string;
 
     constructor() {
@@ -63,15 +66,15 @@ export class Issuer {
         );
         const artifact_creddef = JSON.parse(fs.readFileSync(artifactPath3, 'utf-8'));
 
-        const provider = new ethers.JsonRpcProvider(RPC_URL);
-        const wallet = new ethers.Wallet(PRIVATE_KEY, provider);
-        schemaRegistryContract = new ethers.Contract(SCHEMA_REGISTRY, artifact_schema.abi, wallet);
-        credDefRegistryContract = new ethers.Contract(CREDDEF_REGISTRY, artifact_creddef.abi, wallet);
-        revocationRegistryContract = new ethers.Contract(REVOCATION_REGISTRY, artifact_revocation.abi, wallet);
+        const provider = new ethers.JsonRpcProvider(this.RPC_URL);
+        const wallet = new ethers.Wallet(this.PRIVATE_KEY, provider);
+        this.schemaRegistryContract = new ethers.Contract(this.SCHEMA_REGISTRY, artifact_schema.abi, wallet);
+        this.credDefRegistryContract = new ethers.Contract(this.CREDDEF_REGISTRY, artifact_creddef.abi, wallet);
+        this.revocationRegistryContract = new ethers.Contract(this.REVOCATION_REGISTRY, artifact_revocation.abi, wallet);
 
-        myMap.set('cred1', 1001);
-        myMap.set('cred2', 2002);
-        myMap.set('cred3', 3003);
+        this.myMap.set('cred1', 1001);
+        this.myMap.set('cred2', 2002);
+        this.myMap.set('cred3', 3003);
 
     }
 
@@ -85,39 +88,39 @@ export class Issuer {
 
     async createAccumulator() {
         await initializeWasm();
-        params = PositiveAccumulator.generateParams(this.stringToBytes('vc-rollup-thesis-accumulator-params-v1'));
-        keypair = PositiveAccumulator.generateKeypair(params);
-        state = new InMemoryState();
-        accumulator = PositiveAccumulator.initialize(params);
-        console.log("Initial accumulator:", this.bytesToHex(accumulator.accumulated));
-        return accumulator;
+        this.params = PositiveAccumulator.generateParams(this.stringToBytes('vc-rollup-thesis-accumulator-params-v1'));
+        this.keypair = PositiveAccumulator.generateKeypair(this.params);
+        this.state = new InMemoryState();
+        this.accumulator = PositiveAccumulator.initialize(this.params);
+        console.log("Initial accumulator:", this.bytesToHex(this.accumulator.accumulated));
+        return this.accumulator;
     }
 
     async schemaId() {
         const attributes = ['studentName', 'university', 'degree', 'graduationYear', 'revocationId'];
         const random = Math.floor(Math.random() * 100000);
         const version = "1.0-" + random; //minden futtatásnál új verzió, hogy ne ütközzön a már regisztrált sémákkal
-        const schemaTx = await schemaRegistryContract.registerSchema!("UniversityDegree", version, attributes);
+        const schemaTx = await this.schemaRegistryContract.registerSchema!("UniversityDegree", version, attributes);
         const schemaReceipt = await schemaTx.wait();
         // Az event-ből nyerjük ki a schemaId-t
-        const schemaEvent = schemaRegistryContract.interface.parseLog(schemaReceipt?.logs[0]!);
+        const schemaEvent = this.schemaRegistryContract.interface.parseLog(schemaReceipt?.logs[0]!);
         const schemaId = schemaEvent?.args[0]; // schemaId az első argument
         return schemaId;
     }
 
     async credDefId(schemaId: string) {
-        const credDefTx = await credDefRegistryContract.registerCredDef!(schemaId, "default", PRIVATE_KEY);
+        const credDefTx = await this.credDefRegistryContract.registerCredDef!(schemaId, "default", this.PRIVATE_KEY);
         const credDefReceipt = await credDefTx.wait();
-        const credDefEvent = credDefRegistryContract.interface.parseLog(credDefReceipt?.logs[0]!);
+        const credDefEvent = this.credDefRegistryContract.interface.parseLog(credDefReceipt?.logs[0]!);
         const credDefId = credDefEvent?.args[0]; // credDefId az első argument
         return credDefId;
     }
 
     async revocationRegistry(accumulator: PositiveAccumulator, credDefId: string) {
-        const revTx = await revocationRegistryContract.createRegistry!(credDefId, this.bytesToHex(accumulator.accumulated));
+        const revTx = await this.revocationRegistryContract.createRegistry!(credDefId, this.bytesToHex(accumulator.accumulated));
         const revReceipt = await revTx.wait();
 
-        const revEvent = revocationRegistryContract.interface.parseLog(revReceipt?.logs[0]!);
+        const revEvent = this.revocationRegistryContract.interface.parseLog(revReceipt?.logs[0]!);
         const registryId = revEvent?.args[0]; // registryId az első argument
         const acc = revEvent?.args[3]; // newAccumulator az 4. argument
         console.log("Created registry with accumulator: ", acc);
@@ -125,36 +128,36 @@ export class Issuer {
     }
 
     async addCredentials(credId: string, registryId: string) {
-        const m = Accumulator.encodePositiveNumberAsAccumulatorMember(myMap.get(credId)!);
-        await accumulator.addBatch([m], keypair.secretKey, state);
-        console.log("Accumulator after adding " + credId + ": ", this.bytesToHex(accumulator.accumulated));
+        const m = Accumulator.encodePositiveNumberAsAccumulatorMember(this.myMap.get(credId)!);
+        await this.accumulator.addBatch([m], this.keypair.secretKey, this.state);
+        console.log("Accumulator after adding " + credId + ": ", this.bytesToHex(this.accumulator.accumulated));
 
-        const revup1Tx = await revocationRegistryContract.updateRegistry!(registryId, this.bytesToHex(accumulator.accumulated), [myMap.get(credId)!], []);
+        const revup1Tx = await this.revocationRegistryContract.updateRegistry!(registryId, this.bytesToHex(this.accumulator.accumulated), [this.myMap.get(credId)!], []);
         const revup1Receipt = await revup1Tx.wait();
-        const revup1Event = revocationRegistryContract.interface.parseLog(revup1Receipt?.logs[0]!);
+        const revup1Event = this.revocationRegistryContract.interface.parseLog(revup1Receipt?.logs[0]!);
         const new1Acc = revup1Event?.args[2];
         console.log("Updated registry with new accumulator: ", new1Acc);
         return new1Acc;
     }
 
     async revokeCredentials(credId: string, registryId: string) {
-        const m1 = Accumulator.encodePositiveNumberAsAccumulatorMember(myMap.get(credId)!);
+        const m1 = Accumulator.encodePositiveNumberAsAccumulatorMember(this.myMap.get(credId)!);
 
-        await accumulator.removeBatch([m1], keypair.secretKey, state);
-        console.log("Accumulator after revoking " + credId + ": ", this.bytesToHex(accumulator.accumulated));
+        await this.accumulator.removeBatch([m1], this.keypair.secretKey, this.state);
+        console.log("Accumulator after revoking " + credId + ": ", this.bytesToHex(this.accumulator.accumulated));
 
-        const revRevokeTx = await revocationRegistryContract.updateRegistry!(registryId, this.bytesToHex(accumulator.accumulated), [], [myMap.get(credId)!]);
+        const revRevokeTx = await this.revocationRegistryContract.updateRegistry!(registryId, this.bytesToHex(this.accumulator.accumulated), [], [this.myMap.get(credId)!]);
         const revRevokeReceipt = await revRevokeTx.wait();
-        const revRevokeEvent = revocationRegistryContract.interface.parseLog(revRevokeReceipt?.logs[0]!);
+        const revRevokeEvent = this.revocationRegistryContract.interface.parseLog(revRevokeReceipt?.logs[0]!);
         const revokedAcc = revRevokeEvent?.args[2];
         console.log("Updated registry with new accumulator after revocation " + credId + ": ", revokedAcc);
         return revokedAcc;
     }
 
     async createWitness(credId: string) {
-        const m1 = Accumulator.encodePositiveNumberAsAccumulatorMember(myMap.get(credId)!);
+        const m1 = Accumulator.encodePositiveNumberAsAccumulatorMember(this.myMap.get(credId)!);
         try {
-            const witness = await accumulator.membershipWitness(m1, keypair.secretKey, state);
+            const witness = await this.accumulator.membershipWitness(m1, this.keypair.secretKey, this.state);
             const w1 = Witness.vbAccumulatorMembership(m1, witness);
             console.log("Membership witness for " + credId + ": ", witness);
             return { witness, w1 };
@@ -164,8 +167,8 @@ export class Issuer {
         }
     }
 
-    signCredential(credId: string, keypair: BBSPlusKeypairG2, signatureParams: BBSPlusSignatureParamsG1, messages: Uint8Array[], witness: Witness | null, w: Witness | null, message_count: number) {
-        const m1 = Accumulator.encodePositiveNumberAsAccumulatorMember(myMap.get(credId)!);
+    signCredential(credId: string,  messages: string[], witness1: {witness: VBMembershipWitness; w1: Uint8Array<ArrayBufferLike>;} | null,  message_count: number) {
+        const m1 = Accumulator.encodePositiveNumberAsAccumulatorMember(this.myMap.get(credId)!);
         
         const sigParams = BBSPlusSignatureParamsG1.generate(
             message_count,
@@ -177,18 +180,24 @@ export class Issuer {
 
         const encB = (s: string) => Accumulator.encodeBytesAsAccumulatorMember(this.stringToBytes(s));
         const cred1Messages: Uint8Array[] = [
-            encB('Alice'),       // 0: studentName
-            encB('Budapest U'),  // 1: university
-            encB('BSc'),         // 2: degree
-            encB('2026'),        // 3: graduationYear
+            encB(messages[0]!),       // 0: studentName
+            encB(messages[1]!),  // 1: university
+            encB(messages[2]!),         // 2: degree
+            encB(messages[3]!),        // 3: graduationYear
             m1,                  // 4: revocationId  ← K_HANDLE (same bytes as acc member)
         ];
         const sig1 = BBSPlusSignatureG1.generate(cred1Messages, issuerSk, sigParams, false);
 
-        if (!w || !witness) {
+        if (!witness1) {
             throw new Error('cred1 membership witness is not available — cannot build proof');
         }
 
-        return { sig1, cred1Messages, issuerPk, sigParams };
+        const k_handler = cred1Messages.length - 1; //revocationId index, ami a K_HANDLE lesz a proofban
+
+        return { sig1, cred1Messages, issuerPk, sigParams, k_handler, message_count};
+    }
+
+    getPublicKey() {
+        return this.keypair.publicKey;
     }
 }
