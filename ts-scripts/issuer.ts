@@ -47,7 +47,7 @@ export class Issuer {
     private state!: InMemoryState;
     private params!: AccumulatorParams;
 
-    //private registryId?: string;
+    private schemaid?: string;
 
     constructor() {
         //solidity json fájl beolvasása
@@ -96,16 +96,16 @@ export class Issuer {
         return this.accumulator;
     }
 
-    async schemaId() {
-        const attributes = ['studentName', 'university', 'degree', 'graduationYear', 'revocationId'];
-        const random = Math.floor(Math.random() * 100000);
-        const version = "1.0-" + random; //minden futtatásnál új verzió, hogy ne ütközzön a már regisztrált sémákkal
-        const schemaTx = await this.schemaRegistryContract.registerSchema!("UniversityDegree", version, attributes);
+    async schemaId(name: string, version: string, attributes: string[]) {
+        //const attributes = ['studentName', 'university', 'degree', 'graduationYear', 'revocationId'];
+        //const random = Math.floor(Math.random() * 100000);
+        //const version = "1.0-" + random; //minden futtatásnál új verzió, hogy ne ütközzön a már regisztrált sémákkal
+        const schemaTx = await this.schemaRegistryContract.registerSchema!(name, version, attributes);
         const schemaReceipt = await schemaTx.wait();
         // Az event-ből nyerjük ki a schemaId-t
         const schemaEvent = this.schemaRegistryContract.interface.parseLog(schemaReceipt?.logs[0]!);
-        const schemaId = schemaEvent?.args[0]; // schemaId az első argument
-        return schemaId;
+        this.schemaid = schemaEvent?.args[0]; // schemaId az első argument
+        //return this.schemaId;
     }
 
     async credDefId(schemaId: string) {
@@ -209,5 +209,7 @@ export class Issuer {
         return this.accumulator;
     }
 
-    
+    getSchemaId() {
+        return this.schemaid;
+    }
 }
