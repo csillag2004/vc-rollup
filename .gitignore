@@ -16,3 +16,4 @@ docs/
 .wallets.txt
 
 /node_modules
+/hellocucumber/node_modules

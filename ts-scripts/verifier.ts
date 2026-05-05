@@ -50,6 +50,7 @@ export class Verifier {
 
         const isValid = proof.verify(verifierSpec, nonce);
         console.log("Proof verification result for cred1: ", isValid);
+        return isValid;
     }
 }
 
