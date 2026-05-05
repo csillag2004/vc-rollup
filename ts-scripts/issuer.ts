@@ -200,4 +200,14 @@ export class Issuer {
     getPublicKey() {
         return this.keypair.publicKey;
     }
+
+    getParams() {
+        return this.params;
+    }
+
+    getAccumulator() {
+        return this.accumulator;
+    }
+
+    
 }

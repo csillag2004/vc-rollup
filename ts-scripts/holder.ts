@@ -21,12 +21,15 @@ import {
   BBSPlusSignatureParamsG1,
   BBSPlusSignatureG1,
   AccumulatorPublicKey,
+  MembershipProvingKey,
 } from '@docknetwork/crypto-wasm-ts';
 
 const MESSAGE_COUNT = 5;
 const K_HANDLE = 4;
 
 export class Holder {
+    private provingKey!: MembershipProvingKey;
+    private nonce = this.stringToBytes('nonce1');
 
     private stringToBytes(message: string): Uint8Array {
         return Uint8Array.from(Buffer.from(message, 'utf-8'));
@@ -44,7 +47,7 @@ export class Holder {
             REVEAL.has(i) ? revealedMsgs.set(i, m) : unrevealedMsgs.set(i, m),
         );
 
-        const provingKey = Accumulator.generateMembershipProvingKey(this.stringToBytes('Our proving key'));
+        this.provingKey = Accumulator.generateMembershipProvingKey(this.stringToBytes('Our proving key'));
 
         const proverStmts = new Statements();
         const sBBS = proverStmts.add(
@@ -52,7 +55,7 @@ export class Holder {
         );
         const sAcc = proverStmts.add(
             Statement.vbAccumulatorMembership(
-                params, publickey, provingKey, accumulator.accumulated,
+                params, publickey, this.provingKey, accumulator.accumulated,
             ),
         );
 
@@ -67,10 +70,18 @@ export class Holder {
         witnesses.add(w);
 
         const proofSpec = new ProofSpec(proverStmts, metaStatements);
-        const nonce = this.stringToBytes('nonce1');
-        const proof = CompositeProof.generate(proofSpec, witnesses, nonce);
+        //const nonce = this.stringToBytes('nonce1');
+        const proof = CompositeProof.generate(proofSpec, witnesses, this.nonce);
         console.log("Generated proof for cred1.");
 
         return proof;
+    }
+
+    getProvingKey() {
+        return this.provingKey;
+    }
+
+    getNonce() {
+        return this.nonce;
     }
 }

@@ -61,18 +61,20 @@ async function main() {
     console.log("Credential signature created: ", sign);
 
     //9. composite proof
-    const proof = holder.compositeProofForCredential(sign.sig1, sign.cred1Messages, sign.issuerPk, sign.sigParams, witness1!.witness, witness1!.w1, accumulator.params, sign.issuerPk, accumulator);
+    const proof = holder.compositeProofForCredential(sign.sig1, sign.cred1Messages, sign.issuerPk, sign.sigParams, witness1!.witness, witness1!.w1, accumulator.params, issuer.getPublicKey(), accumulator);
     console.log("Composite proof created: ", proof);
 
     //10. verify proof
-    /*await verifier.buildCompositeProof(sign.sigParams, 
-                                        sign.issuerPk, 
-                                        new Map<number, Uint8Array>([[2, sign.cred1Messages[2]!], [3, sign.cred1Messages[3]!]]), 
-                                        accumulator.params, 
-                                        proof, 
-                                        holder.stringToBytes('some nonce'), 
-                                        accumulator.params, 
-                                        sign.k_handler);*/
+    await verifier.buildCompositeProof(sign.sigParams,
+                                        sign.issuerPk,
+                                        new Map<number, Uint8Array>([[2, sign.cred1Messages[2]!], [3, sign.cred1Messages[3]!]]),
+                                        issuer.getPublicKey(),
+                                        holder.getProvingKey(),
+                                        issuer.getAccumulator(),
+                                        proof,
+                                        holder.getNonce(),
+                                        issuer.getAccumulator().params!,
+                                        sign.k_handler);
 }
 
 main().catch(console.error);

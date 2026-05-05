@@ -8,6 +8,7 @@ import {
   PositiveAccumulator,
   Accumulator,
   AccumulatorParams,
+  AccumulatorKeypair,
   //  InMemoryState
   CompositeProof,
   Witness,
@@ -28,7 +29,7 @@ import {
 
 export class Verifier {
 
-    async buildCompositeProof(sigParams: BBSPlusSignatureParamsG1, issuerPk: BBSPlusKeypairG2['publicKey'], revealedMsgs: Map<number, Uint8Array<ArrayBufferLike>>, keypair: ReturnType<typeof PositiveAccumulator.generateKeypair>, provingKey: MembershipProvingKey, accumulator: PositiveAccumulator, proof: CompositeProof, nonce: Uint8Array, params: AccumulatorParams, k_handle: number) {
+    async buildCompositeProof(sigParams: BBSPlusSignatureParamsG1, issuerPk: BBSPlusKeypairG2['publicKey'], revealedMsgs: Map<number, Uint8Array<ArrayBufferLike>>, keypair: AccumulatorKeypair["publicKey"], provingKey: MembershipProvingKey, accumulator: PositiveAccumulator, proof: CompositeProof, nonce: Uint8Array, params: AccumulatorParams, k_handle: number) {
 
         //10. Verifier rebuilds statements + metastatements (no witnesses, no signature)
         const verStmts = new Statements();
@@ -37,7 +38,7 @@ export class Verifier {
         );
         verStmts.add(
             Statement.vbAccumulatorMembership(
-                params, keypair.publicKey, provingKey, accumulator.accumulated,
+                params, keypair, provingKey, accumulator.accumulated,
             ),
         );
         const eqV = new WitnessEqualityMetaStatement();
