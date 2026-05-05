@@ -31,6 +31,13 @@ export class Holder {
     private provingKey!: MembershipProvingKey;
     private nonce = this.stringToBytes('nonce1');
 
+    //az issuer által aláírt credential + witness tárolása a holderben
+    credentialMap: Map<string, {cred: any, signature: any, y: any, witness: any}> = new Map(); //credId -> {credential, signature, y, witness}
+    private credential: any;
+    private signature: any;
+    private y: any;
+    private witness: any;
+
     private stringToBytes(message: string): Uint8Array {
         return Uint8Array.from(Buffer.from(message, 'utf-8'));
     }
@@ -84,4 +91,12 @@ export class Holder {
     getNonce() {
         return this.nonce;
     }
+
+    setCredential(cred: any, signature: any, y: any, witness: any) {
+        this.credential = cred;
+        this.signature = signature;
+        this.y = y;
+        this.witness = witness;
+    }
+
 }

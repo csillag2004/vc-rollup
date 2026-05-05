@@ -57,14 +57,22 @@ Then ('{string} is added to the accumulator"', function (credId) {
 });
 
 When ('save the accumulator state', function () {
-    this.savedAccumulatorState = this.accumulator;
+    this.savedAccumulatorState = new Uint8Array(this.accumulator.accumulated);
 });
 
 Then ('the accumulator is changed', function () {
-    assert.notEqual(this.accumulator.accumulated, this.savedAccumulatorState.accumulated);
+    assert.notDeepStrictEqual(this.accumulator.accumulated, this.savedAccumulatorState);
 });
     
 Then ('state has {string}', async function (credId) {
     assert.ok(await this.issuer.stateHas(credId));
 });
 
+//6
+Then ('the Issuer issues credential {string} again', async function (credId) {
+    const registryId = this.issuer.getRegistryId();
+    await assert.rejects(
+        async () => await this.issuer.addCredentials(credId, registryId),
+        { message: /already present/ }
+    );
+});

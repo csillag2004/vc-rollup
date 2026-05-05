@@ -141,7 +141,7 @@ export class Issuer {
         const revup1Event = this.revocationRegistryContract.interface.parseLog(revup1Receipt?.logs[0]!);
         const new1Acc = revup1Event?.args[2];
         console.log("Updated registry with new accumulator: ", new1Acc);
-        return new1Acc;
+        return this.accumulator; //!!!ide inkább az kéne, hogy meghívjon egy updateAccumulator függvényt
     }
 
     async revokeCredentials(credId: string, registryId: string) {
@@ -230,5 +230,11 @@ export class Issuer {
             return this.myMap.get(credId);
         }
         throw new Error(`Credential with ID ${credId} not found`);
+    }
+
+    //Claude
+    async stateHas(credId: string): Promise<boolean> {
+        const m = Accumulator.encodePositiveNumberAsAccumulatorMember(this.myMap.get(credId)!);
+        return this.state.has(m);
     }
 }
