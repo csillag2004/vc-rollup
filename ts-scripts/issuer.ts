@@ -42,12 +42,16 @@ export class Issuer {
     private credDefRegistryContract!: ethers.Contract;
     private revocationRegistryContract!: ethers.Contract;
 
+    // FIXME accumulatort nem kéne tárolni az issuerben!!!
     private accumulator!: PositiveAccumulator;
     private keypair!: ReturnType<typeof PositiveAccumulator.generateKeypair>;
     private state!: InMemoryState;
     private params!: AccumulatorParams;
 
+    // FIXME ezekből elég 1????
     private schemaid?: string;
+    private creddefId?: string;
+    private registryId?: string;
 
     constructor() {
         //solidity json fájl beolvasása
@@ -112,8 +116,8 @@ export class Issuer {
         const credDefTx = await this.credDefRegistryContract.registerCredDef!(schemaId, "default", this.PRIVATE_KEY);
         const credDefReceipt = await credDefTx.wait();
         const credDefEvent = this.credDefRegistryContract.interface.parseLog(credDefReceipt?.logs[0]!);
-        const credDefId = credDefEvent?.args[0]; // credDefId az első argument
-        return credDefId;
+        this.creddefId = credDefEvent?.args[0]; // credDefId az első argument
+        return this.creddefId;
     }
 
     async revocationRegistry(accumulator: PositiveAccumulator, credDefId: string) {
@@ -121,10 +125,10 @@ export class Issuer {
         const revReceipt = await revTx.wait();
 
         const revEvent = this.revocationRegistryContract.interface.parseLog(revReceipt?.logs[0]!);
-        const registryId = revEvent?.args[0]; // registryId az első argument
+        this.registryId = revEvent?.args[0]; // registryId az első argument
         const acc = revEvent?.args[3]; // newAccumulator az 4. argument
         console.log("Created registry with accumulator: ", acc);
-        return registryId;
+        return this.registryId;
     }
 
     async addCredentials(credId: string, registryId: string) {
@@ -211,5 +215,20 @@ export class Issuer {
 
     getSchemaId() {
         return this.schemaid;
+    }
+
+    getCredDefId() {
+        return this.creddefId;
+    }
+
+    getRegistryId() {
+        return this.registryId;
+    }
+
+    getCredentialById(credId: string) {
+        if (this.myMap.has(credId)) {
+            return this.myMap.get(credId);
+        }
+        throw new Error(`Credential with ID ${credId} not found`);
     }
 }

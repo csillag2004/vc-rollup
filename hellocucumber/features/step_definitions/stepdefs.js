@@ -29,4 +29,42 @@ Then('the schema is registered successfully', function () {
     assert.ok(this.issuer.getSchemaId());
 });
 
+//4
+When('the Issuer creates a credential definition for the registered schema', async function () {
+    const schemaId = this.issuer.getSchemaId();
+    await this.issuer.credDefId(schemaId);
+});
+
+When ('the issuer creates a revocation registry for the credential definition', async function () {
+    const credDefId = this.issuer.getCredDefId();
+    await this.issuer.revocationRegistry(this.accumulator, credDefId);
+});
+
+When ('the Issuer issues credential {string}', async function (credId) {
+    const registryId = this.issuer.getRegistryId();
+    this.accumulator = await this.issuer.addCredentials(credId, registryId);
+});
+
+Then('the {string} is issued successfully - is available in the map', function (credId) {
+    assert.ok(this.issuer.getCredentialById(credId));
+});
+
+Then ('{string} is added to the accumulator"', function (credId) {
+    const registryId = this.issuer.getRegistryId();
+    const credential = this.issuer.getCredentialById(credId);
+    assert.ok(credential);
+    assert.strictEqual(credential.registryId, registryId);
+});
+
+When ('save the accumulator state', function () {
+    this.savedAccumulatorState = this.accumulator;
+});
+
+Then ('the accumulator is changed', function () {
+    assert.notEqual(this.accumulator.accumulated, this.savedAccumulatorState.accumulated);
+});
+    
+Then ('state has {string}', async function (credId) {
+    assert.ok(await this.issuer.stateHas(credId));
+});
 

@@ -35,7 +35,7 @@ async function main() {
     const accumulator = await issuer.createAccumulator();
 
     //2. schemaIdk létrehozása
-    const schemaId = await issuer.schemaId();
+    const schemaId = await issuer.schemaId(); //kapott attribútumokat
 
     //3. credDefId létrehozása
     const credDefId = await issuer.credDefId(schemaId);
