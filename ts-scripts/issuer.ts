@@ -42,13 +42,13 @@ export class Issuer {
     private credDefRegistryContract!: ethers.Contract;
     private revocationRegistryContract!: ethers.Contract;
 
-    // FIXME accumulatort nem kéne tárolni az issuerben!!!
+    // FIXME accumulatort nem kéne tárolni az issuerben!!! - solkidityn fel
     private accumulator!: PositiveAccumulator;
     private keypair!: ReturnType<typeof PositiveAccumulator.generateKeypair>;
     private state!: InMemoryState;
     private params!: AccumulatorParams;
 
-    // FIXME ezekből elég 1????
+    // FIXME ezekből elég 1???? fa-map json
     private schemaid?: string;
     private creddefId?: string;
     private registryId?: string;
@@ -155,7 +155,9 @@ export class Issuer {
         const revRevokeEvent = this.revocationRegistryContract.interface.parseLog(revRevokeReceipt?.logs[0]!);
         const revokedAcc = revRevokeEvent?.args[2];
         console.log("Updated registry with new accumulator after revocation " + credId + ": ", revokedAcc);
-        return revokedAcc;
+        
+        this.myMap.delete(credId);
+        return this.accumulator;
     }
 
     async createWitness(credId: string) {
@@ -235,6 +237,11 @@ export class Issuer {
     //Claude
     async stateHas(credId: string): Promise<boolean> {
         const m = Accumulator.encodePositiveNumberAsAccumulatorMember(this.myMap.get(credId)!);
+        return this.state.has(m);
+    }
+
+    async stateHas_y(y: number): Promise<boolean> {
+        const m = Accumulator.encodePositiveNumberAsAccumulatorMember(y);
         return this.state.has(m);
     }
 }
