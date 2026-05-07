@@ -14,8 +14,8 @@ Then('the accumulator is created successfully', function () {
 });
 
 //2
-Then('the accumulator is not created successfully', function () {
-    assert.ok(!this.accumulator);
+Then('the accumulator is not created successfully', async function () {
+    assert.ok(!(await this.issuer.getOnChainAccumulator()));
 });
 
 //3
@@ -26,19 +26,19 @@ When('the Issuer registers a schema with name {string}, version {string} and att
 });
 
 Then('the schema is registered successfully', function () {
-    assert.ok(this.issuer.getSchemaId());
+    assert.ok(this.issuer.getSchemaIds().length > 0);
 });
 
 //4
 When('the Issuer creates a credential definition for the registered schema', async function () {
-    const schemaId = this.issuer.getSchemaId();
+    const schemaId = this.issuer.getSchemaIds()[0];
     await this.issuer.credDefId(schemaId);
 });
 
 When ('the issuer creates a revocation registry for the credential definition', async function () {
-    const credDefId = this.issuer.getCredDefId();
-    await this.issuer.revocationRegistry(this.accumulator, credDefId);
-});
+    const credDefId = this.issuer.getCredDefIdsForSchema(this.issuer.getSchemaIds()[0])[0];
+    await this.issuer.revocationRegistry(this.issuer.getOnChainAccumulator(), credDefId);
+}); //eddig néztem át
 
 When ('the Issuer issues credential {string}', async function (credId) {
     const registryId = this.issuer.getRegistryId();
