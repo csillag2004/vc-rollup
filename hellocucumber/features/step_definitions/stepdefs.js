@@ -6,11 +6,11 @@ const MESSAGE_COUNT = 5;
 
 //1
 When('the Issuer create an accumulator', async function () {
-    this.accumulator = await this.issuer.createAccumulator();
+    await this.issuer.createAccumulator();
 });
 
 Then('the accumulator is created successfully', function () {
-    assert.ok(this.accumulator);
+    assert.ok(this.issuer.getOnChainAccumulator());
 });
 
 //2
