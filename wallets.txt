@@ -14,11 +14,3 @@ Contract Address: 0x6fc2bA5f13495EAdBA6a87881d0aD67134e4fCa8
 Block: 17430992
 Paid: 0.000031819063000404 ETH (2029263 gas * 0.015680108 gwei)
 
-
-##### scroll-sepolia
-✅  [Success] Hash: 0x59706dc695ea2e50e5a6b146413ad27f6a80b371ec057785068d46dd65533e6e
-Contract Address: 0xCc8Cc9668E1e58A0947385cFf1561cbA61df6130
-Block: 18025863
-Paid: 0.000008183573806064 ETH (521908 gas * 0.015680108 gwei)
-
-✅ Sequence #1 on scroll-sepolia | Total Paid: 0.000008183573806064 ETH (521908 gas * avg 0.015680108 gwei)

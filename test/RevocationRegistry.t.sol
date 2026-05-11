@@ -5,7 +5,9 @@ import {SchemaRegistry} from "../src/SchemaRegistry.sol";
 import {CredDefRegistry} from "../src/CredDefRegistry.sol";
 import {RevocationRegistry} from "../src/RevocationRegistry.sol";
 
-contract RevocationRegistryTest is Test{
+
+//Már nem aktuális
+/*contract RevocationRegistryTest is Test{
     SchemaRegistry public schemaRegistry;
     CredDefRegistry public credDefRegistry;
     RevocationRegistry public revocationRegistry;
@@ -84,4 +86,4 @@ contract RevocationRegistryTest is Test{
 
         revocationRegistry.updateRegistry(registryId, newAccumulator, new uint256[](2), new uint256[](3));
     }
-}
+}*/

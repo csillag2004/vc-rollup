@@ -37,16 +37,18 @@ When('the Issuer creates a credential definition for the registered schema', asy
 
 When ('the issuer creates a revocation registry for the credential definition', async function () {
     const credDefId = this.issuer.getCredDefIdsForSchema(this.issuer.getSchemaIds()[0])[0];
-    await this.issuer.revocationRegistry(this.issuer.getOnChainAccumulator(), credDefId);
-}); //eddig néztem át
+    await this.issuer.revocationRegistry(credDefId);
+});
 
 When ('the Issuer issues credential {string}', async function (credId) {
-    const registryId = this.issuer.getRegistryId();
-    this.accumulator = await this.issuer.addCredentials(credId, registryId);
+    const schemaId = this.issuer.getSchemaIds()[0];
+    const credDefId = this.issuer.getCredDefIdsForSchema(schemaId)[0];
+    const registryId = this.issuer.getRegistryIdsForCredDef(schemaId, credDefId)[0];
+    await this.issuer.addCredentials(credId, registryId);
 });
 
 Then('the {string} is issued successfully - is available in the map', function (credId) {
-    assert.ok(this.issuer.getCredentialById(credId));
+    assert.ok(this.issuer.findYByCredId(credId)); //ha van y, akkor benne vana cred is
 });
 
 Then('{string} is added to the accumulator', function (credId) {
@@ -56,12 +58,15 @@ Then('{string} is added to the accumulator', function (credId) {
     assert.strictEqual(credential.registryId, registryId);
 });
 
-When('save the accumulator state', function () {
-    this.savedAccumulatorState = new Uint8Array(this.accumulator.accumulated);
+When('save the accumulator state', async function () {
+    const acc = await this.issuer.getOnChainAccumulator();
+    this.savedAccumulatorState = acc ? new Uint8Array(acc.accumulated) : null;
 });
 
-Then('the accumulator is changed', function () {
-    assert.notDeepStrictEqual(this.accumulator.accumulated, this.savedAccumulatorState);
+Then('the accumulator is changed', async function () {
+    const current = await this.issuer.getOnChainAccumulator();
+    const currentBytes = current ? new Uint8Array(current.accumulated) : null;
+    assert.notDeepStrictEqual(currentBytes, this.savedAccumulatorState);
 });
     
 Then('state has {string}', async function (credId) {
@@ -70,7 +75,9 @@ Then('state has {string}', async function (credId) {
 
 //6
 Then('the Issuer issues credential {string} again', async function (credId) {
-    const registryId = this.issuer.getRegistryId();
+    const schemaId = this.issuer.getSchemaIds()[0];
+    const credDefId = this.issuer.getCredDefIdsForSchema(schemaId)[0];
+    const registryId = this.issuer.getRegistryIdsForCredDef(schemaId, credDefId)[0];
     await assert.rejects(
         async () => await this.issuer.addCredentials(credId, registryId),
         { message: /already present/ }
@@ -80,25 +87,38 @@ Then('the Issuer issues credential {string} again', async function (credId) {
 
 //7
 When('the Issuer revokes {string}', async function (credId) {
-    const registryId = this.issuer.getRegistryId();
+    const registryId = await this.issuer.findRegistryIdByCredId(credId);
     this.accumulator = await this.issuer.revokeCredentials(credId, registryId);
 });
 
-Then('the {string} is removed successfully - is not available in the map', async function (credId) {
+Then('the {string} is removed successfully - is not available in the map', async function (credId) { //nem szedem ki a mapból
     await assert.rejects(
         async () => await this.issuer.getCredentialById(credId),
         { message: /not found/ }
     );
 });
 
-Then('state does not have', async function () {
+Then('state does not have {string}', async function (credId) {
     /*await assert.rejects(
         async () => await this.issuer.stateHas(credId),
         { message: /not found/ }
     );*/
-    assert.ok(!await this.issuer.stateHas_y(this.cred_y));
+        assert.ok(!(await this.issuer.stateHas(credId)));
 });
 
-When('save the y {string}', function (credId) {
+When('save the y {string}', function (credId) { //erre nem lesz szükség
     this.cred_y = this.issuer.getCredentialById(credId); //majd menjen mappbe
+});
+
+//8
+When('the Issuer revokes {string} - not existing', async function (credId) {
+    //const registryId = 
+    assert.ok(!(await this.issuer.findRegistryIdByCredId(credId)));
+    //assert.ok(!(await this.issuer.revokeCredentials(credId, registryId)));
+});
+
+Then('the accumulator is not changed', async function () {
+    const current = await this.issuer.getOnChainAccumulator();
+    const currentBytes = current ? new Uint8Array(current.accumulated) : null;
+    assert.deepStrictEqual(currentBytes, this.savedAccumulatorState);
 });

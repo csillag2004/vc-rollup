@@ -1,12 +1,13 @@
 pragma solidity ^0.8.24;
 import {CredDefRegistry} from "./CredDefRegistry.sol";
+import {Accumulator} from "./Accumulator.sol";
 
 contract RevocationRegistry{
 
     struct RevocationList {
         bytes32 credDefId;
         address issuer;
-        bytes currentAccumulator;
+        Accumulator currentAccumulator;
         uint256 currentEpoch;
         uint256 createdAt;
     }
@@ -27,18 +28,30 @@ contract RevocationRegistry{
         uint256[] revokedScalars
     );
 
-    event RegistryCreated(bytes32 indexed registryId, bytes32 indexed credDefId, address indexed issuer, bytes newAccumulator);
+    event RegistryCreated(
+        bytes32 indexed registryId,
+        bytes32 indexed credDefId,
+        address indexed issuer,
+        address accumulator,
+        bytes initialAccumulator
+    );
 
 
     function createRegistry(
         bytes32 credDefId,
-        bytes calldata initialAccumulator
+        address accumulatorAddr
     ) external returns (bytes32 registryId){
         //REVERTEK
         CredDefRegistry.CredDef memory c = credDefRegistry.getCredDef(credDefId);
         if (c.createdAt == 0) revert("This CredDef does not exist.");
         if (c.issuer != msg.sender) revert("Only issuer can create the registry.");
-        if (initialAccumulator.length==0) revert("Accumulator is empty.");
+        if (accumulatorAddr == address(0)) revert("Accumulator address is zero.");
+
+        Accumulator acc = Accumulator(accumulatorAddr);
+        if (acc.getOwner() != msg.sender) revert("Issuer must own the accumulator.");
+
+        bytes memory initial = acc.getAccumulator();
+        if (initial.length == 0) revert("Accumulator is empty.");
 
         registryId = keccak256(abi.encodePacked(msg.sender, credDefId));
 
@@ -51,12 +64,12 @@ contract RevocationRegistry{
         RevocationList storage r = lists[registryId];
         r.credDefId = credDefId;
         r.issuer = msg.sender;
-        r.currentAccumulator = initialAccumulator;
+        r.currentAccumulator = acc;
         r.currentEpoch = 0;
         r.createdAt = block.timestamp;
 
         //event kiküldés
-        emit RegistryCreated(registryId, credDefId, msg.sender, initialAccumulator);
+        emit RegistryCreated(registryId, credDefId, msg.sender, accumulatorAddr, initial);
 
         return registryId;
     }
@@ -64,26 +77,26 @@ contract RevocationRegistry{
 
     function updateRegistry(
         bytes32 registryId,
-        bytes calldata newAccumulator,
         uint256[] calldata addedScalars,
         uint256[] calldata revokedScalars
     ) external{
         //revertek
-        if (!(lists[registryId].createdAt > 0)) revert("This RevocationList does not exist.");
-        if (newAccumulator.length==0) revert("Accumulator is empty.");
-        if (msg.sender != lists[registryId].issuer) revert("Only issuer can update the registry.");
+        RevocationList storage r = lists[registryId];
+        if (!(r.createdAt > 0)) revert("This RevocationList does not exist.");
+        if (msg.sender != r.issuer) revert("Only issuer can update the registry.");
         if (addedScalars.length == 0 && revokedScalars.length == 0) revert("Nothing to update.");
 
-        //módosítás
-        lists[registryId].currentAccumulator = newAccumulator;
-        lists[registryId].currentEpoch++;
-        
-        
+        // Read current bytes from the issuer-owned Accumulator contract
+        bytes memory current = r.currentAccumulator.getAccumulator();
+        if (current.length == 0) revert("Accumulator is empty.");
+
+        r.currentEpoch++;
+
         //event kiküldés
         emit UpdatedRegistry(
             registryId,
-            lists[registryId].currentEpoch,
-            newAccumulator,
+            r.currentEpoch,
+            current,
             addedScalars,
             revokedScalars
         );
@@ -91,9 +104,8 @@ contract RevocationRegistry{
 
 
     function getRegistry(bytes32 registryId) external view returns (bytes memory value, uint256 epoch){
-        if (!(lists[registryId].createdAt > 0)) revert("This RevocationList does not exist.");
-        return (lists[registryId].currentAccumulator, lists[registryId].currentEpoch);
+        RevocationList storage r = lists[registryId];
+        if (!(r.createdAt > 0)) revert("This RevocationList does not exist.");
+        return (r.currentAccumulator.getAccumulator(), r.currentEpoch);
     }
-
-
 }

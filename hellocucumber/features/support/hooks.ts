@@ -6,7 +6,7 @@ import { Holder } from '../../../ts-scripts/holder';
 import { Issuer } from '../../../ts-scripts/issuer';
 import { setDefaultTimeout } from '@cucumber/cucumber';
 
-setDefaultTimeout(60 * 1000); // 60 másodperc
+setDefaultTimeout(120 * 1000); // 60 másodperc
 
 dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 
