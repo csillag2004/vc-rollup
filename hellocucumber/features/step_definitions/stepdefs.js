@@ -1,8 +1,8 @@
 const { Given, When, Then } = require('@cucumber/cucumber');
 const assert = require('node:assert/strict');
 
-const ATTRS = ['Alice', 'University X', 'Computer Science', '2024'];
-const MESSAGE_COUNT = 5;
+//const ATTRS = ['Alice', 'University X', 'Computer Science', '2024'];
+//const MESSAGE_COUNT = 5;
 
 //1
 When('the Issuer create an accumulator', async function () {
@@ -142,4 +142,42 @@ Then("the witness is valid for {string}", async function (credId) {
     assert.ok(witness, `Witness for ${credId} should exist`);
     const isValid = await this.issuer.verifyWitness(credId, witness);
     assert.ok(isValid, `Witness for ${credId} should be valid`);
+});
+
+//11
+When('the Issuer creates a witness for {string} - after revocation', async function (credId) {
+    await assert.rejects(
+        async () => await this.issuer.createWitness(credId),
+        { message: "credential is revoked, cannot generate witness" }
+    );
+});
+
+Then('the witness is not created for {string}', async function (credId) {
+    const witness = this.issuer.getWitness(credId);
+    assert.ok(!witness, `Witness for ${credId} should not exist`);
+});
+
+//12
+Then("the witness is invalid for {string}", async function (credId) {
+    const witness = this.issuer.getWitness(credId);
+    assert.ok(witness, `Witness for ${credId} should exist`);
+    const isValid = await this.issuer.verifyWitness(credId, witness);
+    assert.ok(!isValid, `Witness for ${credId} should be invalid`);
+});
+
+When('the Issuer updates witness for {string}', async function (credId) {
+    await this.issuer.createWitness(credId);
+});
+
+//13
+When("the Issuer signs credential {string} with messages {string}", async function (credId, messages) {
+    const messageList = messages.split(", ").map(s => s.trim());
+    witness = this.issuer.getWitness(credId);
+    await this.issuer.signCredential(credId, messageList, witness, messageList.length+1);
+});
+
+Then("the signature for {string} is valid for messages {string}", function (credId, messages) {
+    const messageList = messages.split(", ").map(s => s.trim());
+    const signResult = this.issuer.verifySignature(credId, messageList);
+    assert.ok(signResult, `Signature for ${credId} should be valid for messages ${messages}`);
 });

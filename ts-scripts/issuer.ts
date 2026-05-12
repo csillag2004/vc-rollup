@@ -18,6 +18,7 @@ import {
   WitnessEqualityMetaStatement,
   MetaStatement,
   BBSPlusKeypairG2,
+  BBSPlusPublicKeyG2,
   BBSPlusSignatureParamsG1,
   BBSPlusSignatureG1,
   AccumulatorParams,
@@ -31,6 +32,15 @@ import { stat } from 'fs/promises';
 
 
 
+
+type SignCredentialResult = {
+    sig1: BBSPlusSignatureG1;
+    cred1Messages: Uint8Array[];
+    issuerPk: BBSPlusPublicKeyG2;
+    sigParams: BBSPlusSignatureParamsG1;
+    k_handler: number;
+    message_count: number;
+};
 
 export class Issuer {
     private readonly RPC_URL = 'https://sepolia-rpc.scroll.io';
@@ -64,8 +74,10 @@ export class Issuer {
 
     // schemaId → (credDefId → (registryId → (credId → number)))
     private schemaTree: Map<string, Map<string, Map<string, Map<string, number>>>> = new Map();
-    //credId -> witness
+    // credId -> current witness (recreate whenever the accumulator changes)
     private witnesses: Map<string, VBMembershipWitness> = new Map();
+    // credId -> sign result (set once at signCredential time, permanent)
+    private signResults: Map<string, SignCredentialResult> = new Map();
 
 
     constructor() {
@@ -366,13 +378,17 @@ export class Issuer {
             this.witnesses.set(credId, witness);
             return { witness, w1 };
         } catch (e) {
-            console.log(credId + " is revoked, cannot generate witness");
+            throw new Error("credential is revoked, cannot generate witness");
             return null;
         }
     }
 
     getWitness(credId: string): VBMembershipWitness | null {
         return this.witnesses.get(credId) ?? null;
+    }
+
+    getSignResult(credId: string): SignCredentialResult | null {
+        return this.signResults.get(credId) ?? null;
     }
 
     async verifyWitness(credId: string, witness: VBMembershipWitness): Promise<boolean> {
@@ -389,16 +405,21 @@ export class Issuer {
         if (!pk || !params) {
             throw new Error("Accumulator publicKey/params not initialized on-chain");
         }
+        const storedWitness = this.getWitness(credId);
+        if (!storedWitness) {
+            throw new Error(`No witness stored for ${credId}`);
+        }
         return accumulator.verifyMembershipWitness(
             Accumulator.encodePositiveNumberAsAccumulatorMember(y),
-            this.witnesses.get(credId)!,
+            storedWitness,
             pk,
             params
         );
     }
 
-    /*signCredential(credId: string,  messages: string[], witness1: {witness: VBMembershipWitness; w1: Uint8Array<ArrayBufferLike>;} | null,  message_count: number) {
-        const m1 = Accumulator.encodePositiveNumberAsAccumulatorMember(this.myMap.get(credId)!);
+    async signCredential(credId: string,  messages: string[], witness1: {witness: VBMembershipWitness; w1: Uint8Array<ArrayBufferLike>;} | null,  message_count: number) {
+        const y = await this.findYByCredId(credId);
+        const m1 = Accumulator.encodePositiveNumberAsAccumulatorMember(y!);
         
         const sigParams = BBSPlusSignatureParamsG1.generate(
             message_count,
@@ -419,15 +440,40 @@ export class Issuer {
         const sig1 = BBSPlusSignatureG1.generate(cred1Messages, issuerSk, sigParams, false);
 
         if (!witness1) {
-            throw new Error('cred1 membership witness is not available — cannot build proof');
+            throw new Error('cred1 membership witness is not available');
         }
 
         const k_handler = cred1Messages.length - 1; //revocationId index, ami a K_HANDLE lesz a proofban
-
-        return { sig1, cred1Messages, issuerPk, sigParams, k_handler, message_count};
+        this.signResults.set(credId, { sig1, cred1Messages, issuerPk, sigParams, k_handler, message_count });
+        //return { sig1, cred1Messages, issuerPk, sigParams, k_handler, message_count};
     }
 
-    getPublicKey() {
+    async verifySignature(credId: string, messages: string[]): Promise<boolean> {
+        const signResult = this.getSignResult(credId);
+        if (!signResult) {
+            throw new Error(`No signature result found for ${credId}`);
+        }
+
+        const signature = signResult.sig1;
+        const issuerPk = signResult.issuerPk;
+        const sigParams = signResult.sigParams;
+
+        const y = await this.findYByCredId(credId);
+        const m1 = Accumulator.encodePositiveNumberAsAccumulatorMember(y!);
+
+        const encB = (s: string) => Accumulator.encodeBytesAsAccumulatorMember(this.stringToBytes(s));
+        const credMessages: Uint8Array[] = [
+            encB(messages[0]!),       // 0: studentName
+            encB(messages[1]!),  // 1: university
+            encB(messages[2]!),         // 2: degree
+            encB(messages[3]!),        // 3: graduationYear
+            m1,                  // 4: revocationId  ← K_HANDLE (same bytes as acc member)
+        ];
+
+        return signature.verify(credMessages, issuerPk, sigParams, false).verified;
+    }
+
+    /*getPublicKey() {
         return this.keypair.publicKey;
     }
 
