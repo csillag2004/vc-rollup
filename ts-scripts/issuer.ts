@@ -21,6 +21,7 @@ import {
   BBSPlusSignatureParamsG1,
   BBSPlusSignatureG1,
   AccumulatorParams,
+  AccumulatorPublicKey,
   VBMembershipWitness,
   AccumulatorSecretKey,
 } from '@docknetwork/crypto-wasm-ts';
@@ -63,6 +64,9 @@ export class Issuer {
 
     // schemaId → (credDefId → (registryId → (credId → number)))
     private schemaTree: Map<string, Map<string, Map<string, Map<string, number>>>> = new Map();
+    //credId -> witness
+    private witnesses: Map<string, VBMembershipWitness> = new Map();
+
 
     constructor() {
         //solidity json fájl beolvasása
@@ -131,6 +135,24 @@ export class Issuer {
             return null;
         }
         return PositiveAccumulator.fromAccumulated(Uint8Array.from(Buffer.from(onChainAccumulator.slice(2), 'hex')));
+    }
+
+    async getPublicKey(): Promise<AccumulatorPublicKey | null> {
+        const onChainPublicKey: string = await this.accumulatorContract.getPublicKey!();
+        if (!onChainPublicKey || onChainPublicKey === '0x' || onChainPublicKey.length <= 2) {
+            return null;
+        }
+        const bytes = Uint8Array.from(Buffer.from(onChainPublicKey.slice(2), 'hex'));
+        return new AccumulatorPublicKey(bytes);
+    }
+
+    async getParams(): Promise<AccumulatorParams | null> {
+        const onChainParams: string = await this.accumulatorContract.getParams!();
+        if (!onChainParams || onChainParams === '0x' || onChainParams.length <= 2) {
+            return null;
+        }
+        const bytes = Uint8Array.from(Buffer.from(onChainParams.slice(2), 'hex'));
+        return new AccumulatorParams(bytes);
     }
 
     async getAccumulatorAddress(): Promise<string> {
@@ -312,10 +334,10 @@ export class Issuer {
     async revokeCredentials(credId: string, registryId: string) {
         const y = await this.findYByCredId(credId);
         if (y === null) {
-            throw new Error(`Credential ${credId} does not exist, cannot revoke`);
+            throw new Error(`Credential does not exist, cannot revoke`);
         }
         if (!(await this.stateHas(credId))) {
-            throw new Error(`Credential ${credId} is not in the state, cannot revoke`);
+            throw new Error(`Credential is not in the state, cannot revoke`);
         }
         const m1 = Accumulator.encodePositiveNumberAsAccumulatorMember(y);
 
@@ -330,12 +352,18 @@ export class Issuer {
         await revRevokeTx.wait();
     }
 
-    /*async createWitness(credId: string) {
-        const m1 = Accumulator.encodePositiveNumberAsAccumulatorMember(this.myMap.get(credId)!);
+    async createWitness(credId: string) {
+        const y = await this.findYByCredId(credId);
+        if (y === null) {
+            throw new Error(`Credential does not exist, cannot create witness`);
+        }
+        const m1 = Accumulator.encodePositiveNumberAsAccumulatorMember(y!);
         try {
-            const witness = await this.accumulator.membershipWitness(m1, this.keypair.secretKey, this.state);
+            const accumulator = await this.getOnChainAccumulator();
+            const witness = await accumulator!.membershipWitness(m1, this.accu_private_key, this.state);
             const w1 = Witness.vbAccumulatorMembership(m1, witness);
             console.log("Membership witness for " + credId + ": ", witness);
+            this.witnesses.set(credId, witness);
             return { witness, w1 };
         } catch (e) {
             console.log(credId + " is revoked, cannot generate witness");
@@ -343,7 +371,33 @@ export class Issuer {
         }
     }
 
-    signCredential(credId: string,  messages: string[], witness1: {witness: VBMembershipWitness; w1: Uint8Array<ArrayBufferLike>;} | null,  message_count: number) {
+    getWitness(credId: string): VBMembershipWitness | null {
+        return this.witnesses.get(credId) ?? null;
+    }
+
+    async verifyWitness(credId: string, witness: VBMembershipWitness): Promise<boolean> {
+        const y = await this.findYByCredId(credId);
+        if (y === null) {
+            throw new Error(`Credential does not exist, cannot verify witness`);
+        }
+        const accumulator = await this.getOnChainAccumulator();
+        if (!accumulator) {
+            throw new Error("Accumulator not initialized on-chain");
+        }
+        const pk = await this.getPublicKey();
+        const params = await this.getParams();
+        if (!pk || !params) {
+            throw new Error("Accumulator publicKey/params not initialized on-chain");
+        }
+        return accumulator.verifyMembershipWitness(
+            Accumulator.encodePositiveNumberAsAccumulatorMember(y),
+            this.witnesses.get(credId)!,
+            pk,
+            params
+        );
+    }
+
+    /*signCredential(credId: string,  messages: string[], witness1: {witness: VBMembershipWitness; w1: Uint8Array<ArrayBufferLike>;} | null,  message_count: number) {
         const m1 = Accumulator.encodePositiveNumberAsAccumulatorMember(this.myMap.get(credId)!);
         
         const sigParams = BBSPlusSignatureParamsG1.generate(

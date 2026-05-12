@@ -122,3 +122,24 @@ Then('the accumulator is not changed', async function () {
     const currentBytes = current ? new Uint8Array(current.accumulated) : null;
     assert.deepStrictEqual(currentBytes, this.savedAccumulatorState);
 });
+
+//9
+When('the Issuer revokes {string} again', async function (credId) {
+    const registryId = await this.issuer.findRegistryIdByCredId(credId);
+    await assert.rejects(
+        async () => await this.issuer.revokeCredentials(credId, registryId),
+        { message: "Credential is not in the state, cannot revoke" }
+    );
+});
+
+//10 
+Then('the Issuer creates the first witness for {string}', async function (credId) {
+    await this.issuer.createWitness(credId);
+});
+
+Then("the witness is valid for {string}", async function (credId) {
+    const witness = this.issuer.getWitness(credId);
+    assert.ok(witness, `Witness for ${credId} should exist`);
+    const isValid = await this.issuer.verifyWitness(credId, witness);
+    assert.ok(isValid, `Witness for ${credId} should be valid`);
+});
