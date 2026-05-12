@@ -176,8 +176,15 @@ When("the Issuer signs credential {string} with messages {string}", async functi
     await this.issuer.signCredential(credId, messageList, witness, messageList.length+1);
 });
 
-Then("the signature for {string} is valid for messages {string}", function (credId, messages) {
+Then("the signature for {string} is valid for messages {string}", async function (credId, messages) {
     const messageList = messages.split(", ").map(s => s.trim());
-    const signResult = this.issuer.verifySignature(credId, messageList);
+    const signResult = await this.issuer.verifySignature(credId, messageList);
     assert.ok(signResult, `Signature for ${credId} should be valid for messages ${messages}`);
+});
+
+//14
+Then("the signature for {string} is not valid for messages {string}", async function (credId, messages) {
+    const messageList = messages.split(", ").map(s => s.trim());
+    const signResult = await this.issuer.verifySignature(credId, messageList);
+    assert.ok(!signResult, `Signature for ${credId} should not be valid for messages ${messages}`);
 });

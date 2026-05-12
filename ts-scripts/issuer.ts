@@ -430,12 +430,10 @@ export class Issuer {
         const issuerPk = issuerKp.publicKey;
 
         const encB = (s: string) => Accumulator.encodeBytesAsAccumulatorMember(this.stringToBytes(s));
+        // encode every caller-supplied message, then append the revocationId as the final element (the K_HANDLE)
         const cred1Messages: Uint8Array[] = [
-            encB(messages[0]!),       // 0: studentName
-            encB(messages[1]!),  // 1: university
-            encB(messages[2]!),         // 2: degree
-            encB(messages[3]!),        // 3: graduationYear
-            m1,                  // 4: revocationId  ← K_HANDLE (same bytes as acc member)
+            ...messages.map(m => encB(m)),
+            m1,
         ];
         const sig1 = BBSPlusSignatureG1.generate(cred1Messages, issuerSk, sigParams, false);
 
@@ -460,17 +458,19 @@ export class Issuer {
 
         const y = await this.findYByCredId(credId);
         const m1 = Accumulator.encodePositiveNumberAsAccumulatorMember(y!);
-
         const encB = (s: string) => Accumulator.encodeBytesAsAccumulatorMember(this.stringToBytes(s));
         const credMessages: Uint8Array[] = [
-            encB(messages[0]!),       // 0: studentName
-            encB(messages[1]!),  // 1: university
-            encB(messages[2]!),         // 2: degree
-            encB(messages[3]!),        // 3: graduationYear
-            m1,                  // 4: revocationId  ← K_HANDLE (same bytes as acc member)
+            ...messages.map(m => encB(m)),
+            m1,
         ];
 
-        return signature.verify(credMessages, issuerPk, sigParams, false).verified;
+        try{
+            const isValid = signature.verify(credMessages, issuerPk, sigParams, false).verified;
+            return isValid;
+        }
+        catch(e){
+            return false;
+        }
     }
 
     /*getPublicKey() {
