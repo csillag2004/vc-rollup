@@ -3,6 +3,7 @@ import { ethers } from 'ethers';
 import * as fs from 'fs';
 import * as path from 'path';
 import { InMemoryState } from '../ts-scripts/in-memory-persistence';
+import {Holder} from './holder';
 import {
   initializeWasm,
   PositiveAccumulator,
@@ -39,7 +40,7 @@ type SignCredentialResult = {
     issuerPk: BBSPlusPublicKeyG2;
     sigParams: BBSPlusSignatureParamsG1;
     k_handler: number;
-    message_count: number;
+    message_count: number;  
 };
 
 export class Issuer {
@@ -78,6 +79,7 @@ export class Issuer {
     private witnesses: Map<string, VBMembershipWitness> = new Map();
     // credId -> sign result (set once at signCredential time, permanent)
     private signResults: Map<string, SignCredentialResult> = new Map();
+    private credentialHolders: Map<string, Holder> = new Map();
 
 
     constructor() {
@@ -314,12 +316,13 @@ export class Issuer {
         //return this.registryId;
     }
 
-    async addCredentials(credId: string, registryId: string) {
+    async addCredentials(credId: string, registryId: string, holder: Holder) {
         // reuse existing y if this credId was already issued, otherwise generate a new one
         const y = (await this.findYByCredId(credId)) ?? (Math.floor(Math.random() * (Number.MAX_SAFE_INTEGER - 1)) + 1);
         const credDefId = this.findCredDefIdByRegistry(registryId)!;
         const schemaId = this.findSchemaIdByCredDef(credDefId)!;
         this.addCredToTree(schemaId, credDefId, registryId, credId, y);
+        this.credentialHolders.set(credId, holder); //EZ ÍGY JÓ???
 
         const m = Accumulator.encodePositiveNumberAsAccumulatorMember(y);
         const accumulator = await this.getOnChainAccumulator();
@@ -372,7 +375,7 @@ export class Issuer {
         const m1 = Accumulator.encodePositiveNumberAsAccumulatorMember(y!);
         try {
             const accumulator = await this.getOnChainAccumulator();
-            const witness = await accumulator!.membershipWitness(m1, this.accu_private_key, this.state);
+            const witness = await accumulator!.membershipWitness(m1, this.accu_private_key, this.state); //holder oldalon legyen egy accumulator proving key
             const w1 = Witness.vbAccumulatorMembership(m1, witness);
             console.log("Membership witness for " + credId + ": ", witness);
             this.witnesses.set(credId, witness);
@@ -443,10 +446,14 @@ export class Issuer {
 
         const k_handler = cred1Messages.length - 1; //revocationId index, ami a K_HANDLE lesz a proofban
         this.signResults.set(credId, { sig1, cred1Messages, issuerPk, sigParams, k_handler, message_count });
+        const registryId = await this.findRegistryIdByCredId(credId);
+        const credDefId = this.findCredDefIdByRegistry(registryId!);
+        const schemaId = this.findSchemaIdByCredDef(credDefId!);
+        this.credentialHolders.get(credId)?.setCredential(credId, schemaId!, credDefId!, registryId!, y!, sig1, cred1Messages, issuerPk, sigParams, k_handler, message_count, witness1.witness, witness1.w1);
         //return { sig1, cred1Messages, issuerPk, sigParams, k_handler, message_count};
     }
 
-    async verifySignature(credId: string, messages: string[]): Promise<boolean> {
+    async verifySignature(credId: string, messages: string[]): Promise<boolean> { //ez csak teszteléshez létezik?
         const signResult = this.getSignResult(credId);
         if (!signResult) {
             throw new Error(`No signature result found for ${credId}`);

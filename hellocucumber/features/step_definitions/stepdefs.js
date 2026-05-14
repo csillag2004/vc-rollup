@@ -44,7 +44,7 @@ When ('the Issuer issues credential {string}', async function (credId) {
     const schemaId = this.issuer.getSchemaIds()[0];
     const credDefId = this.issuer.getCredDefIdsForSchema(schemaId)[0];
     const registryId = this.issuer.getRegistryIdsForCredDef(schemaId, credDefId)[0];
-    await this.issuer.addCredentials(credId, registryId);
+    await this.issuer.addCredentials(credId, registryId, this.holder);
 });
 
 Then('the {string} is issued successfully - is available in the map', function (credId) {
@@ -187,4 +187,12 @@ Then("the signature for {string} is not valid for messages {string}", async func
     const messageList = messages.split(", ").map(s => s.trim());
     const signResult = await this.issuer.verifySignature(credId, messageList);
     assert.ok(!signResult, `Signature for ${credId} should not be valid for messages ${messages}`);
+});
+
+//16
+Then("the Holder has credential {string}", async function (credId) {
+    const schemaId = this.issuer.getSchemaIds()[0];
+    const credDefId = this.issuer.getCredDefIdsForSchema(schemaId)[0];
+    const registryId = this.issuer.getRegistryIdsForCredDef(schemaId, credDefId)[0];
+    assert.ok(await this.holder.getCredential(credId), `Holder should have credential ${credId}`);
 });
