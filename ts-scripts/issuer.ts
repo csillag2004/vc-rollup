@@ -80,6 +80,7 @@ export class Issuer {
     // credId -> sign result (set once at signCredential time, permanent)
     private signResults: Map<string, SignCredentialResult> = new Map();
     private credentialHolders: Map<string, Holder> = new Map();
+    private starterBlock: Map<string, number> = new Map(); 
 
 
     constructor() {
@@ -330,13 +331,15 @@ export class Issuer {
         await accumulator.addBatch([m], this.accu_private_key, this.state); //off-chain update
         //console.log("y:" + y);
 
-        // Push new accumulator bytes to chain BEFORE updateRegistry reads them
-        const accTx = await this.accumulatorContract.setAccumulator!(this.bytesToHex(accumulator.accumulated));
-        await accTx.wait(); //on-chain update
-
-        // Now update the registry — its event will read the new bytes
+        // updateRegistry first — its event reads the on-chain accumulator, which is still the
+        // pre-add value. That's what `updatePostAdd` expects as accumulatorValueBeforeAddition.
         const revup1Tx = await this.revocationRegistryContract.updateRegistry!(registryId, [y], []);
-        await revup1Tx.wait();
+        const revup1Receipt = await revup1Tx.wait();
+        this.starterBlock.set(credId, revup1Receipt.blockNumber);
+
+        // Now push the post-add bytes on-chain
+        const accTx = await this.accumulatorContract.setAccumulator!(this.bytesToHex(accumulator.accumulated));
+        await accTx.wait();
     }
 
     //Claude
@@ -449,7 +452,7 @@ export class Issuer {
         const registryId = await this.findRegistryIdByCredId(credId);
         const credDefId = this.findCredDefIdByRegistry(registryId!);
         const schemaId = this.findSchemaIdByCredDef(credDefId!);
-        this.credentialHolders.get(credId)?.setCredential(credId, schemaId!, credDefId!, registryId!, y!, sig1, cred1Messages, issuerPk, sigParams, k_handler, message_count, witness1.witness, witness1.w1);
+        this.credentialHolders.get(credId)?.setCredential(credId, schemaId!, credDefId!, registryId!, y!, sig1, cred1Messages, issuerPk, sigParams, k_handler, message_count, witness1.witness, witness1.w1, this.starterBlock.get(credId)!);
         console.log("\nw1: ", witness1.w1, "\n");
         //return { sig1, cred1Messages, issuerPk, sigParams, k_handler, message_count};
     }

@@ -43,12 +43,17 @@ type Credential = {
     message_count: number;
     witness: VBMembershipWitness;
     w: Uint8Array<ArrayBufferLike>;
+    epoch: number;
+    lastSyncedBlock: number;
 }
 
 export class Holder {
     private readonly ACCUMULATOR_ADDR = process.env.ACCUMULATOR_ADDR!;
     private readonly PRIVATE_KEY = process.env.PRIVATE_KEY!;
-     private readonly RPC_URL = 'https://sepolia-rpc.scroll.io';
+    private readonly REVOCATION_REGISTRY = process.env.REVOCATION_REGISTRY_ADDR!;
+    private readonly RPC_URL = 'https://sepolia-rpc.scroll.io';
+
+    private revocationRegistryContract!: ethers.Contract;
     private accumulatorContract!: ethers.Contract;
 
     private provingKey!: MembershipProvingKey;
@@ -62,6 +67,11 @@ export class Holder {
     //private witness: any;
 
     constructor() {
+        const artifactPath = path.resolve(
+            __dirname, '..','out',  'RevocationRegistry.sol', 'RevocationRegistry.json'
+        );
+        const artifact_revocation = JSON.parse(fs.readFileSync(artifactPath, 'utf-8'));
+
         const artifactPath4 = path.resolve(
             __dirname, '..', 'out', 'Accumulator.sol', 'Accumulator.json'
         );
@@ -69,6 +79,7 @@ export class Holder {
 
         const provider = new ethers.JsonRpcProvider(this.RPC_URL);
         const wallet = new ethers.Wallet(this.PRIVATE_KEY, provider);
+        this.revocationRegistryContract = new ethers.Contract(this.REVOCATION_REGISTRY, artifact_revocation.abi, wallet);
         this.accumulatorContract = new ethers.Contract(this.ACCUMULATOR_ADDR, artifact_accumulator.abi, wallet);  //le kell nullázni az akkumlátort!!!
 
     }
@@ -159,6 +170,87 @@ export class Holder {
         return new AccumulatorPublicKey(bytes);
     }
 
+    async verifyWitness(credId: string): Promise<boolean> {
+        const credential = this.credentialMap.get(credId);
+        if (!credential) {
+            console.error(`Credential with ID ${credId} not found.`);
+            return false;
+        }
+        const y = credential.y;
+        const witness = credential.witness;
+        const accumulator = await this.getOnChainAccumulator();
+        const publicKey = await this.getPublicKey();
+        const params = await this.getParams();
+        if (!accumulator || !publicKey || !params) {
+            console.error('Failed to retrieve accumulator, public key, or parameters from the contract.');
+            return false;
+        }
+        return accumulator.verifyMembershipWitness(Accumulator.encodePositiveNumberAsAccumulatorMember(y), witness, publicKey, params);
+    }
+
+    getWitness(credId: string): VBMembershipWitness | null {
+        const credential = this.credentialMap.get(credId);
+        if (!credential) {
+            console.error(`Credential with ID ${credId} not found.`);
+            return null;
+        }
+        return credential.witness;
+    }
+
+    async getEpoch(credId: string) {
+        const epoch = await this.revocationRegistryContract.getRegistry!(this.credentialMap.get(credId)!.registryId);
+        return epoch;
+    }
+
+    async updateWitness(credId: string){
+        const credential = this.credentialMap.get(credId);
+        const epoch = await this.getEpoch(credId);
+        if (!credential) {
+            console.error(`Credential with ID ${credId} not found.`);
+            return;
+        }
+        if(credential.epoch === undefined || credential.epoch >= epoch){
+            console.log(`Credential with ID ${credId} is already up to date.`);
+            return;
+        }
+        const fromBlock = credential.lastSyncedBlock + 1;
+        const filter = this.revocationRegistryContract.filters.UpdatedRegistry!(credential.registryId);
+        const events = await this.revocationRegistryContract.queryFilter(filter,fromBlock,'latest');
+        if (events.length === 0) {
+            return;
+        }
+        let witness = credential.witness;
+        const y = credential.y;
+        const m = Accumulator.encodePositiveNumberAsAccumulatorMember(y);
+        for (const event of events) {
+            if (!('args' in event)) {
+                continue;
+            }
+            const {
+                registryId,
+                epoch: eventEpoch,
+                newAccumulator,
+                addedScalars,
+                revokedScalars,
+            } = event.args;
+            console.log("accumulator:", newAccumulator);
+            const accBytes = ethers.getBytes(newAccumulator);
+    
+            for (const yAdded of addedScalars as bigint[]) {
+                const addedM = Accumulator.encodePositiveNumberAsAccumulatorMember(Number(yAdded));
+                witness.updatePostAdd(addedM, m, accBytes);
+            }
+            for (const yRemoved of revokedScalars as bigint[]) {
+                const removedM = Accumulator.encodePositiveNumberAsAccumulatorMember(Number(yRemoved));
+                witness.updatePostRemove(removedM, m, accBytes);
+            }
+            credential.epoch = Number(eventEpoch);
+            credential.lastSyncedBlock = event.blockNumber;
+        }
+        credential.witness = witness;
+        credential.w = Witness.vbAccumulatorMembership(m, witness);
+    }
+
 
     /*getProvingKey() {
         return this.provingKey;
@@ -180,7 +272,9 @@ export class Holder {
         k_handle: number,
         message_count: number,
         witness: VBMembershipWitness,
-        w: Uint8Array<ArrayBufferLike>) {
+        w: Uint8Array<ArrayBufferLike>,
+        lastSyncedBlock: number) {
+
         const credential: Credential = {
             schemaId,
             credDefId,
@@ -193,7 +287,9 @@ export class Holder {
             k_handle,
             message_count,
             witness,
-            w
+            w,
+            epoch: 0,
+            lastSyncedBlock: lastSyncedBlock
         };
         this.credentialMap.set(credId, credential);
     }

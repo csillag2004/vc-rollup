@@ -203,3 +203,23 @@ Then("the proof is created successfully for {string}", async function (credId) {
     const proof = await this.holder.compositeProofForCredential(credId);
     assert.ok(proof, `Proof should be created successfully for ${credId}`);
 });
+
+//18
+Then("the Holder's witness is valid for {string}", async function (credId) {
+    const witness = this.holder.getWitness(credId);
+    assert.ok(witness, `Witness for ${credId} should exist`);
+    const isValid = await this.holder.verifyWitness(credId);
+    assert.ok(isValid, `Witness for ${credId} should be valid`);
+});
+
+//20
+Then("the Holder's witness is invalid for {string}", async function (credId) {
+    const witness = this.holder.getWitness(credId);
+    assert.ok(witness, `Witness for ${credId} should exist`);
+    const isValid = await this.holder.verifyWitness(credId);
+    assert.ok(!isValid, `Witness for ${credId} should be invalid`);
+});
+
+When("the Holder updates witness for {string}", async function (credId) {
+    await this.holder.updateWitness(credId);
+});

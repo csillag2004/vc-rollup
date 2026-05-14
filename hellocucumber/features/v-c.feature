@@ -206,7 +206,7 @@ Feature: Verifiable Credential issuance and proof verification
 
     Then the signature for "cred1" is not valid for messages "Alice, MIT, PhD"
 
-  
+  @holder
   Scenario: 16. Holder get credential and verify signature - ezt még bővítsd ki ellenőrzéssel
     Given the Issuer create an accumulator
     And the Issuer registers a schema with name "Degree", version "first-version" and attributes "studentName, university, degree, graduationYear"
@@ -218,7 +218,7 @@ Feature: Verifiable Credential issuance and proof verification
 
     Then the Holder has credential "cred1"
 
-  
+  @holder
   Scenario: 17. Holder get 2 credentials and verify signature
     Given the Issuer create an accumulator
     And the Issuer registers a schema with name "Degree", version "first-version" and attributes "studentName, university, degree, graduationYear"
@@ -235,7 +235,7 @@ Feature: Verifiable Credential issuance and proof verification
     Then the Holder has credential "cred1"
     And the Holder has credential "cred2"
 
-  @run
+   @holder
   Scenario: 18. Holder create proof for credential
     Given the Issuer create an accumulator
     And the Issuer registers a schema with name "Degree", version "first-version" and attributes "studentName, university, degree, graduationYear"
@@ -247,5 +247,33 @@ Feature: Verifiable Credential issuance and proof verification
 
     Then the proof is created successfully for "cred1"
 
+  @holder
+  Scenario: 19. Holder verify witness from Issuer
+    Given the Issuer create an accumulator
+    And the Issuer registers a schema with name "Degree", version "first-version" and attributes "studentName, university, degree, graduationYear"
+    And the Issuer creates a credential definition for the registered schema
+    And the issuer creates a revocation registry for the credential definition
+    And the Issuer issues credential "cred1"
+    And the Issuer creates the first witness for "cred1"
+    And the Issuer signs credential "cred1" with messages "Alice, MIT, PhD, 2024"
 
+    Then the Holder's witness is valid for "cred1"
+
+  @holder @run
+  Scenario: 20. No error for witness update
+    Given the Issuer create an accumulator
+    And the Issuer registers a schema with name "Degree", version "first-version" and attributes "studentName, university, degree, graduationYear"
+    And the Issuer creates a credential definition for the registered schema
+    And the issuer creates a revocation registry for the credential definition
+    And the Issuer issues credential "cred1"
+    And the Issuer creates the first witness for "cred1"
+    And the Issuer signs credential "cred1" with messages "Alice, MIT, PhD, 2024"
+
+    When the Issuer issues credential "cred2"
+
+    Then the Holder's witness is invalid for "cred1"
+
+    And the Holder updates witness for "cred1"
+
+    Then the Holder's witness is valid for "cred1"
     
