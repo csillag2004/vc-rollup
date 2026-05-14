@@ -76,7 +76,7 @@ export class Issuer {
     // schemaId → (credDefId → (registryId → (credId → number)))
     private schemaTree: Map<string, Map<string, Map<string, Map<string, number>>>> = new Map();
     // credId -> current witness (recreate whenever the accumulator changes)
-    private witnesses: Map<string, VBMembershipWitness> = new Map();
+    private witnesses: Map<string, { witness: VBMembershipWitness; w1: Uint8Array<ArrayBufferLike> }> = new Map();
     // credId -> sign result (set once at signCredential time, permanent)
     private signResults: Map<string, SignCredentialResult> = new Map();
     private credentialHolders: Map<string, Holder> = new Map();
@@ -378,7 +378,7 @@ export class Issuer {
             const witness = await accumulator!.membershipWitness(m1, this.accu_private_key, this.state); //holder oldalon legyen egy accumulator proving key
             const w1 = Witness.vbAccumulatorMembership(m1, witness);
             console.log("Membership witness for " + credId + ": ", witness);
-            this.witnesses.set(credId, witness);
+            this.witnesses.set(credId, { witness, w1 });
             return { witness, w1 };
         } catch (e) {
             throw new Error("credential is revoked, cannot generate witness");
@@ -386,7 +386,7 @@ export class Issuer {
         }
     }
 
-    getWitness(credId: string): VBMembershipWitness | null {
+    getWitness(credId: string): { witness: VBMembershipWitness; w1: Uint8Array<ArrayBufferLike> } | null {
         return this.witnesses.get(credId) ?? null;
     }
 
@@ -414,7 +414,7 @@ export class Issuer {
         }
         return accumulator.verifyMembershipWitness(
             Accumulator.encodePositiveNumberAsAccumulatorMember(y),
-            storedWitness,
+            storedWitness.witness, //ide ez kell vagy a sima w?
             pk,
             params
         );
@@ -450,6 +450,7 @@ export class Issuer {
         const credDefId = this.findCredDefIdByRegistry(registryId!);
         const schemaId = this.findSchemaIdByCredDef(credDefId!);
         this.credentialHolders.get(credId)?.setCredential(credId, schemaId!, credDefId!, registryId!, y!, sig1, cred1Messages, issuerPk, sigParams, k_handler, message_count, witness1.witness, witness1.w1);
+        console.log("\nw1: ", witness1.w1, "\n");
         //return { sig1, cred1Messages, issuerPk, sigParams, k_handler, message_count};
     }
 

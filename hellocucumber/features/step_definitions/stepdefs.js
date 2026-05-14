@@ -173,6 +173,7 @@ When('the Issuer updates witness for {string}', async function (credId) {
 When("the Issuer signs credential {string} with messages {string}", async function (credId, messages) {
     const messageList = messages.split(", ").map(s => s.trim());
     witness = this.issuer.getWitness(credId);
+    console.log("w1: ", witness.w1);
     await this.issuer.signCredential(credId, messageList, witness, messageList.length+1);
 });
 
@@ -195,4 +196,10 @@ Then("the Holder has credential {string}", async function (credId) {
     const credDefId = this.issuer.getCredDefIdsForSchema(schemaId)[0];
     const registryId = this.issuer.getRegistryIdsForCredDef(schemaId, credDefId)[0];
     assert.ok(await this.holder.getCredential(credId), `Holder should have credential ${credId}`);
+});
+
+//17
+Then("the proof is created successfully for {string}", async function (credId) {
+    const proof = await this.holder.compositeProofForCredential(credId);
+    assert.ok(proof, `Proof should be created successfully for ${credId}`);
 });
