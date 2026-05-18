@@ -66,7 +66,7 @@ Feature: Verifiable Credential issuance and proof verification
     And state has "cred1"
     And the Issuer issues credential "cred1" again
 
-  @issuer
+  @issuer 
   Scenario: 7. Revoke credential
     Given the Issuer create an accumulator 
     And the Issuer registers a schema with name "Degree", version "first-version" and attributes "studentName, university, degree, graduationYear" 
@@ -207,7 +207,7 @@ Feature: Verifiable Credential issuance and proof verification
     Then the signature for "cred1" is not valid for messages "Alice, MIT, PhD"
 
   @holder
-  Scenario: 16. Holder get credential and verify signature - ezt még bővítsd ki ellenőrzéssel
+  Scenario: 16. Holder get credential and verify signature
     Given the Issuer create an accumulator
     And the Issuer registers a schema with name "Degree", version "first-version" and attributes "studentName, university, degree, graduationYear"
     And the Issuer creates a credential definition for the registered schema

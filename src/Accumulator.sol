@@ -5,7 +5,9 @@ contract Accumulator {
     bytes publicKey;
     bytes params;
     address owner;
-    
+    bytes witnessUpdateInfo;
+
+
     constructor() {
         owner = msg.sender;
     }
@@ -15,18 +17,26 @@ contract Accumulator {
         _;
     }
 
-    event giveaccumulatorValue(bytes value);
+    event AccumulatorUpdated(
+        bytes value,
+        uint256[] additions,
+        uint256[] removals,
+        bytes witnessUpdateInfo
+    );
     event givepublicKey(bytes value);
     event giveparams(bytes value);
     event giveowner(address value);
 
-    function setAccumulator(bytes calldata newValue) external onlyOwner {
+    function setAccumulator(bytes calldata newValue, uint256[] calldata additions, uint256[] calldata removals, bytes calldata witnessInfo) external onlyOwner {
         accumulatorValue = newValue;
+        witnessUpdateInfo = witnessInfo;
+        emit AccumulatorUpdated(accumulatorValue, additions, removals, witnessUpdateInfo);
     }
 
     function getAccumulator() external view returns (bytes memory) {
         return accumulatorValue;
     }
+
 
     function setPublicKey(bytes calldata newPublicKey) external onlyOwner {
         publicKey = newPublicKey;

@@ -26,10 +26,12 @@ import {
   AccumulatorPublicKey,
   VBMembershipWitness,
   AccumulatorSecretKey,
+  VBWitnessUpdateInfo
 } from '@docknetwork/crypto-wasm-ts';
 import { on } from 'events';
 import { findPackageJSON } from 'module';
 import { stat } from 'fs/promises';
+import { WitnessUpdateInfo } from '@docknetwork/crypto-wasm-ts/lib/accumulator/witness-update-info';
 
 
 
@@ -136,7 +138,9 @@ export class Issuer {
 
         this.accu_private_key = keypair.secretKey;
 
-        const accTx = await this.accumulatorContract.setAccumulator!(this.bytesToHex(accumulator.accumulated));
+        const witnessUpdateInfo = VBWitnessUpdateInfo.new(accumulator.accumulated, [], [], this.accu_private_key)
+
+        const accTx = await this.accumulatorContract.setAccumulator!(this.bytesToHex(accumulator.accumulated), [], [], this.bytesToHex(witnessUpdateInfo.value));
         await accTx.wait();
         const accTx2 = await this.accumulatorContract.setParams!(this.bytesToHex(params.bytes));
         await accTx2.wait();
@@ -328,6 +332,7 @@ export class Issuer {
         const m = Accumulator.encodePositiveNumberAsAccumulatorMember(y);
         const accumulator = await this.getOnChainAccumulator();
         if (!accumulator) throw new Error("Accumulator not initialized on-chain");
+        const witnessUpdateInfo = VBWitnessUpdateInfo.new(accumulator.accumulated, [m], [], this.accu_private_key)
         await accumulator.addBatch([m], this.accu_private_key, this.state); //off-chain update
         //console.log("y:" + y);
 
@@ -338,7 +343,7 @@ export class Issuer {
         this.starterBlock.set(credId, revup1Receipt.blockNumber);
 
         // Now push the post-add bytes on-chain
-        const accTx = await this.accumulatorContract.setAccumulator!(this.bytesToHex(accumulator.accumulated));
+        const accTx = await this.accumulatorContract.setAccumulator!(this.bytesToHex(accumulator.accumulated), [y], [], this.bytesToHex(witnessUpdateInfo.value));
         await accTx.wait();
     }
 
@@ -360,10 +365,11 @@ export class Issuer {
         const m1 = Accumulator.encodePositiveNumberAsAccumulatorMember(y);
 
         const accumulator = await this.getOnChainAccumulator();
+        const witnessUpdateInfo = VBWitnessUpdateInfo.new(accumulator!.accumulated, [], [m1], this.accu_private_key)
         await accumulator!.removeBatch([m1], this.accu_private_key, this.state);
         //console.log("Accumulator after revoking " + credId + ": ", this.bytesToHex(this.accumulator.accumulated));
 
-        const accTx = await this.accumulatorContract.setAccumulator!(this.bytesToHex(accumulator!.accumulated));
+        const accTx = await this.accumulatorContract.setAccumulator!(this.bytesToHex(accumulator!.accumulated), [], [y], this.bytesToHex(witnessUpdateInfo.value));
         await accTx.wait(); //on-chain update
 
         const revRevokeTx = await this.revocationRegistryContract.updateRegistry!(registryId, [], [y]);

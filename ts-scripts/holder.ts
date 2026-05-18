@@ -26,6 +26,7 @@ import {
   VBMembershipWitness,
   AccumulatorParams,
 } from '@docknetwork/crypto-wasm-ts';
+import { VBWitnessUpdateInfo, WitnessUpdateInfo } from '@docknetwork/crypto-wasm-ts/lib/accumulator/witness-update-info';
 
 //const MESSAGE_COUNT = 5;
 //const K_HANDLE = 4;
@@ -214,12 +215,12 @@ export class Holder {
             return;
         }
         const fromBlock = credential.lastSyncedBlock + 1;
-        const filter = this.revocationRegistryContract.filters.UpdatedRegistry!(credential.registryId);
-        const events = await this.revocationRegistryContract.queryFilter(filter,fromBlock,'latest');
+        const filter = this.accumulatorContract.filters.AccumulatorUpdated!();
+        const events = await this.accumulatorContract.queryFilter(filter, fromBlock, 'latest');
         if (events.length === 0) {
             return;
         }
-        let witness = credential.witness;
+        let witness1 = credential.witness;
         const y = credential.y;
         const m = Accumulator.encodePositiveNumberAsAccumulatorMember(y);
         for (const event of events) {
@@ -227,28 +228,34 @@ export class Holder {
                 continue;
             }
             const {
-                registryId,
-                epoch: eventEpoch,
-                newAccumulator,
-                addedScalars,
-                revokedScalars,
+                value,
+                additions,
+                removals,
+                witnessUpdateInfo
             } = event.args;
-            console.log("accumulator:", newAccumulator);
-            const accBytes = ethers.getBytes(newAccumulator);
-    
-            for (const yAdded of addedScalars as bigint[]) {
+            console.log("accumulator:", value);
+            const accBytes = ethers.getBytes(value);
+            const updateInfo = new VBWitnessUpdateInfo(ethers.getBytes(witnessUpdateInfo));
+            const addedMembers = (additions as bigint[]).map(y =>
+                Accumulator.encodePositiveNumberAsAccumulatorMember(Number(y))
+            );
+            const removedMembers = (removals as bigint[]).map(y =>
+                Accumulator.encodePositiveNumberAsAccumulatorMember(Number(y))
+            );
+            witness1.updateUsingPublicInfoPostBatchUpdate(m, addedMembers, removedMembers, updateInfo)
+            /*for (const yAdded of addedScalars as bigint[]) {
                 const addedM = Accumulator.encodePositiveNumberAsAccumulatorMember(Number(yAdded));
                 witness.updatePostAdd(addedM, m, accBytes);
             }
             for (const yRemoved of revokedScalars as bigint[]) {
                 const removedM = Accumulator.encodePositiveNumberAsAccumulatorMember(Number(yRemoved));
                 witness.updatePostRemove(removedM, m, accBytes);
-            }
-            credential.epoch = Number(eventEpoch);
+            }*/
+            credential.epoch++; //= //Number(eventEpoch);
             credential.lastSyncedBlock = event.blockNumber;
         }
-        credential.witness = witness;
-        credential.w = Witness.vbAccumulatorMembership(m, witness);
+        credential.witness = witness1;
+        credential.w = Witness.vbAccumulatorMembership(m, witness1);
     }
 
 
