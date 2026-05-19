@@ -203,7 +203,7 @@ Then("the Holder has credential {string}", async function (credId) {
 
 //17
 Then("the proof is created successfully for {string}", async function (credId) {
-    const proof = await this.holder.compositeProofForCredential(credId, [2, 3]);
+    const proof = await this.holder.compositeProofForCredential(credId, [2, 3], this.verifier);
     assert.ok(proof, `Proof should be created successfully for ${credId}`);
 });
 
@@ -245,6 +245,12 @@ When("the Holder cannot updates witness for {string}", async function (credId) {
 
 //23
 Then("the proof is not created successfully for {string}", async function (credId) {
-    const proof = await this.holder.compositeProofForCredential(credId, [2, 3]);
+    const proof = await this.holder.compositeProofForCredential(credId, [2, 3], this.verifier);
     assert.ok(proof, `Proof should be created successfully for ${credId}`);
+});
+
+//24.
+Then("Verifier has proof for {string}", async function (credIs) {
+   const proof = await this.verifier.getProof(credIs);
+   assert.ok(proof, "Verifier should have proof.") 
 });

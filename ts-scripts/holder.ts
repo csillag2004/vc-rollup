@@ -3,6 +3,7 @@ import { ethers } from 'ethers';
 import * as fs from 'fs';
 import * as path from 'path';
 import { InMemoryState } from '../ts-scripts/in-memory-persistence';
+import {Verifier} from './verifier';
 import {
   initializeWasm,
   PositiveAccumulator,
@@ -50,7 +51,7 @@ type Credential = {
 
 export class Holder {
     private readonly ACCUMULATOR_ADDR = process.env.ACCUMULATOR_ADDR!;
-    private readonly PRIVATE_KEY = process.env.PRIVATE_KEY!;
+    private readonly PRIVATE_KEY = process.env.PRIVATE_KEY_HOLDER!;
     private readonly REVOCATION_REGISTRY = process.env.REVOCATION_REGISTRY_ADDR!;
     private readonly RPC_URL = 'https://sepolia-rpc.scroll.io';
 
@@ -101,7 +102,7 @@ export class Holder {
         return this.credentialMap.get(credId) || null;
     }
 
-    async compositeProofForCredential(credId: string, reveals: number[]): Promise<CompositeProof | null> {
+    async compositeProofForCredential(credId: string, reveals: number[], verifier: Verifier): Promise<CompositeProof | null> {
         const credential = this.credentialMap.get(credId);
         if (!credential) {
             console.error(`Credential with ID ${credId} not found.`);
@@ -142,7 +143,7 @@ export class Holder {
         //const nonce = this.stringToBytes('nonce1');
         const proof = CompositeProof.generate(proofSpec, witnesses, this.nonce);
         console.log("Generated proof for cred1.");
-
+        await verifier.setProofInfo(credId, proof, revealedMsgs, credential.schemaId, credential.credDefId, credential.registryId, this.nonce);
         return proof;
     }
 

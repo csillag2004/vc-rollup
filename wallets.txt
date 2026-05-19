@@ -6,6 +6,9 @@ holder:
 Address:     0x497f3cB3B180D52a6a8AD56a026E4C3c3b9fDaA3
 Private key: 0xcff364135181027c7a4bdf91dbb68a31bf9878bf07f233bb06c727e1e91c09ee
 
+verifier:
+Address:     0x8e369af44EEa6aC2037b070D9BcF2A320f02f4F0
+Private key: 0xbdfe2efe104e0a502512b719f8889ac14f4671af0196e661b23afd1fa047213f
 
 Deployed DID Registry:
 ##### scroll-sepolia

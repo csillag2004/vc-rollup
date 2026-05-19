@@ -49,7 +49,7 @@ export class Issuer {
     private readonly RPC_URL = 'https://sepolia-rpc.scroll.io';
     private readonly CHAIN_ID = 534351;
     private readonly REGISTRY = process.env.REGISTRY_ADDRESS!;
-    private readonly PRIVATE_KEY = process.env.PRIVATE_KEY!;
+    private readonly PRIVATE_KEY = process.env.PRIVATE_KEY_ISSUER!;
     private readonly CREDDEF_REGISTRY = process.env.CREDDEF_REGISTRY_ADDR!;
     private readonly REVOCATION_REGISTRY = process.env.REVOCATION_REGISTRY_ADDR!;
     private readonly SCHEMA_REGISTRY = process.env.SCHEMA_REGISTRY_ADDR!;

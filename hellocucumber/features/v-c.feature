@@ -251,7 +251,7 @@ Feature: Verifiable Credential issuance and proof verification
 
     Then the proof is created successfully for "cred1"
 
-  @holder @run
+  @holder 
   Scenario: 19. Holder verify witness from Issuer
     Given the Issuer create an accumulator
     And the Issuer registers a schema with name "Degree", version "first-version" and attributes "studentName, university, degree, graduationYear"
@@ -326,6 +326,22 @@ Feature: Verifiable Credential issuance and proof verification
     And the Issuer revokes "cred1"
 
     Then the proof is not created successfully for "cred1"
+
+  @run @verifier
+  Scenario: 24. Verifier get proof datas
+    Given the Issuer create an accumulator
+    And the Issuer registers a schema with name "Degree", version "first-version" and attributes "studentName, university, degree, graduationYear"
+    And the Issuer creates a credential definition for the registered schema
+    And the issuer creates a revocation registry for the credential definition
+    And the Issuer issues credential "cred1"
+    And the Issuer creates the first witness for "cred1"
+    And the Issuer signs credential "cred1" with messages "Alice, MIT, PhD, 2024"
+
+    When the Holder has credential "cred1"
+
+    Then the proof is created successfully for "cred1"
+    And Verifier has proof for "cred1"
+
 
 
     
