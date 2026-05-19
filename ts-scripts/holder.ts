@@ -101,14 +101,15 @@ export class Holder {
         return this.credentialMap.get(credId) || null;
     }
 
-    async compositeProofForCredential(credId: string): Promise<CompositeProof | null> {
+    async compositeProofForCredential(credId: string, reveals: number[]): Promise<CompositeProof | null> {
         const credential = this.credentialMap.get(credId);
         if (!credential) {
             console.error(`Credential with ID ${credId} not found.`);
             return null;
         }
 
-        const REVEAL = new Set<number>([2, 3]); // reveal degree + graduationYear
+        //const REVEAL = new Set<number>([2, 3]); // reveal degree + graduationYear
+        const REVEAL = new Set<number>(reveals);
         const revealedMsgs = new Map<number, Uint8Array>();
         const unrevealedMsgs = new Map<number, Uint8Array>();
         credential.messages.forEach((m, i) =>
@@ -171,8 +172,10 @@ export class Holder {
         return new AccumulatorPublicKey(bytes);
     }
 
-    async verifyWitness(credId: string): Promise<boolean> {
-        const credential = this.credentialMap.get(credId);
+    async verifyWitness(credId: string, credential?: Credential): Promise<boolean> {
+        if (!credential){
+            credential = this.credentialMap.get(credId);
+        }
         if (!credential) {
             console.error(`Credential with ID ${credId} not found.`);
             return false;
@@ -204,58 +207,65 @@ export class Holder {
     }
 
     async updateWitness(credId: string){
-        const credential = this.credentialMap.get(credId);
-        const epoch = await this.getEpoch(credId);
-        if (!credential) {
-            console.error(`Credential with ID ${credId} not found.`);
-            return;
-        }
-        if(credential.epoch === undefined || credential.epoch >= epoch){
-            console.log(`Credential with ID ${credId} is already up to date.`);
-            return;
-        }
-        const fromBlock = credential.lastSyncedBlock + 1;
-        const filter = this.accumulatorContract.filters.AccumulatorUpdated!();
-        const events = await this.accumulatorContract.queryFilter(filter, fromBlock, 'latest');
-        if (events.length === 0) {
-            return;
-        }
-        let witness1 = credential.witness;
-        const y = credential.y;
-        const m = Accumulator.encodePositiveNumberAsAccumulatorMember(y);
-        for (const event of events) {
-            if (!('args' in event)) {
-                continue;
+        try{
+            const credential = this.credentialMap.get(credId);
+            const epoch = await this.getEpoch(credId);
+            if (!credential) {
+                console.error(`Credential with ID ${credId} not found.`);
+                return;
             }
-            const {
-                value,
-                additions,
-                removals,
-                witnessUpdateInfo
-            } = event.args;
-            console.log("accumulator:", value);
-            const accBytes = ethers.getBytes(value);
-            const updateInfo = new VBWitnessUpdateInfo(ethers.getBytes(witnessUpdateInfo));
-            const addedMembers = (additions as bigint[]).map(y =>
-                Accumulator.encodePositiveNumberAsAccumulatorMember(Number(y))
-            );
-            const removedMembers = (removals as bigint[]).map(y =>
-                Accumulator.encodePositiveNumberAsAccumulatorMember(Number(y))
-            );
-            witness1.updateUsingPublicInfoPostBatchUpdate(m, addedMembers, removedMembers, updateInfo)
-            /*for (const yAdded of addedScalars as bigint[]) {
-                const addedM = Accumulator.encodePositiveNumberAsAccumulatorMember(Number(yAdded));
-                witness.updatePostAdd(addedM, m, accBytes);
+            if(credential.epoch === undefined || credential.epoch >= epoch){
+                console.log(`Credential with ID ${credId} is already up to date.`);
+                return;
             }
-            for (const yRemoved of revokedScalars as bigint[]) {
-                const removedM = Accumulator.encodePositiveNumberAsAccumulatorMember(Number(yRemoved));
-                witness.updatePostRemove(removedM, m, accBytes);
-            }*/
-            credential.epoch++; //= //Number(eventEpoch);
-            credential.lastSyncedBlock = event.blockNumber;
+            const fromBlock = credential.lastSyncedBlock + 1;
+            const filter = this.accumulatorContract.filters.AccumulatorUpdated!();
+            const events = await this.accumulatorContract.queryFilter(filter, fromBlock, 'latest');
+            if (events.length === 0) {
+                return;
+            }
+            let witness1 = credential.witness;
+            const y = credential.y;
+            const m = Accumulator.encodePositiveNumberAsAccumulatorMember(y);
+            for (const event of events) {
+                if (!('args' in event)) {
+                    continue;
+                }
+                const {
+                    value,
+                    additions,
+                    removals,
+                    witnessUpdateInfo,
+                    epoch
+                } = event.args;
+                console.log("accumulator:", value);
+                const accBytes = ethers.getBytes(value);
+                const updateInfo = new VBWitnessUpdateInfo(ethers.getBytes(witnessUpdateInfo));
+                const addedMembers = (additions as bigint[]).map(y =>
+                    Accumulator.encodePositiveNumberAsAccumulatorMember(Number(y))
+                );
+                const removedMembers = (removals as bigint[]).map(y =>
+                    Accumulator.encodePositiveNumberAsAccumulatorMember(Number(y))
+                );
+                witness1.updateUsingPublicInfoPostBatchUpdate(m, addedMembers, removedMembers, updateInfo)
+                /*for (const yAdded of addedScalars as bigint[]) {
+                    const addedM = Accumulator.encodePositiveNumberAsAccumulatorMember(Number(yAdded));
+                    witness.updatePostAdd(addedM, m, accBytes);
+                }
+                for (const yRemoved of revokedScalars as bigint[]) {
+                    const removedM = Accumulator.encodePositiveNumberAsAccumulatorMember(Number(yRemoved));
+                    witness.updatePostRemove(removedM, m, accBytes);
+                }*/
+                credential.epoch=Number(epoch);
+                credential.lastSyncedBlock = event.blockNumber;
+            }
+            credential.witness = witness1;
+            credential.w = Witness.vbAccumulatorMembership(m, witness1);
         }
-        credential.witness = witness1;
-        credential.w = Witness.vbAccumulatorMembership(m, witness1);
+        catch(CannotBeZero)
+        {
+            throw new Error("credential is revoked, cannot update witness");
+        }
     }
 
 
@@ -267,7 +277,7 @@ export class Holder {
         return this.nonce;
     }*/
 
-    setCredential(credId: string, 
+    async setCredential(credId: string, 
         schemaId: string,
         credDefId: string,
         registryId: string,
@@ -298,7 +308,10 @@ export class Holder {
             epoch: 0,
             lastSyncedBlock: lastSyncedBlock
         };
+        //if(!(await this.verifyWitness(credId, credential))) return;
+    
         this.credentialMap.set(credId, credential);
+        
     }
 
     

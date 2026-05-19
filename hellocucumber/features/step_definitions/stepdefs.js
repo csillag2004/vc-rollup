@@ -1,6 +1,8 @@
 const { Given, When, Then } = require('@cucumber/cucumber');
 const assert = require('node:assert/strict');
 
+const { uuidv7 } = require('uuidv7');
+
 //const ATTRS = ['Alice', 'University X', 'Computer Science', '2024'];
 //const MESSAGE_COUNT = 5;
 
@@ -21,7 +23,8 @@ Then('the accumulator is not created successfully', async function () {
 //3
 When('the Issuer registers a schema with name {string}, version {string} and attributes {string}', async function (name, version, attributes) {
     const attrsArray = attributes.split(',').map(attr => attr.trim());
-    const v = version + '-' + Math.floor(Math.random() * 100000); //minden futtatásnál új verzió, hogy ne ütközzön a már regisztrált sémákkal
+    const v = uuidv7();
+    //const v = version + '-' + Math.floor(Math.random() * 100000); //minden futtatásnál új verzió, hogy ne ütközzön a már regisztrált sémákkal
     await this.issuer.schemaId(name, v, attrsArray);
 });
 
@@ -200,7 +203,7 @@ Then("the Holder has credential {string}", async function (credId) {
 
 //17
 Then("the proof is created successfully for {string}", async function (credId) {
-    const proof = await this.holder.compositeProofForCredential(credId);
+    const proof = await this.holder.compositeProofForCredential(credId, [2, 3]);
     assert.ok(proof, `Proof should be created successfully for ${credId}`);
 });
 
@@ -222,4 +225,26 @@ Then("the Holder's witness is invalid for {string}", async function (credId) {
 
 When("the Holder updates witness for {string}", async function (credId) {
     await this.holder.updateWitness(credId);
+});
+
+//21
+Then("the Holder not has credential {string}", async function (credId) {
+    const schemaId = this.issuer.getSchemaIds()[0];
+    const credDefId = this.issuer.getCredDefIdsForSchema(schemaId)[0];
+    const registryId = this.issuer.getRegistryIdsForCredDef(schemaId, credDefId)[0];
+    assert.ok(!(await this.holder.getCredential(credId)), `Holder should have credential ${credId}`);
+});
+
+//22
+When("the Holder cannot updates witness for {string}", async function (credId) {
+    await assert.rejects(
+        async () => await this.holder.updateWitness(credId),
+        { message: "credential is revoked, cannot update witness" }
+    );
+});
+
+//23
+Then("the proof is not created successfully for {string}", async function (credId) {
+    const proof = await this.holder.compositeProofForCredential(credId, [2, 3]);
+    assert.ok(proof, `Proof should be created successfully for ${credId}`);
 });

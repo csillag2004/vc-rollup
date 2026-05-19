@@ -21,7 +21,8 @@
     "dotenv": "^17.3.1",
     "ethers": "^6.16.0",
     "ethr-did": "^3.0.38",
-    "ethr-did-resolver": "^11.1.0"
+    "ethr-did-resolver": "^11.1.0",
+    "uuidv7": "^1.2.1"
   },
   "devDependencies": {
     "@types/node": "^25.5.0",
