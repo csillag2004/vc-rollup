@@ -40,7 +40,7 @@ type SignCredentialResult = {
     sig1: BBSPlusSignatureG1;
     cred1Messages: Uint8Array[];
     issuerPk: BBSPlusPublicKeyG2;
-    sigParams: BBSPlusSignatureParamsG1;
+    sigParams?: BBSPlusSignatureParamsG1;
     k_handler: number;
     message_count: number;  
 };
@@ -68,6 +68,7 @@ export class Issuer {
     private state!: InMemoryState;
     //private params!: AccumulatorParams;
     private accu_private_key!: AccumulatorSecretKey;
+    private issuer_kp!: BBSPlusKeypairG2;
 
 
     // FIXME ezekből elég 1???? fa-map json
@@ -301,12 +302,26 @@ export class Issuer {
     }
 
     async credDefId(schemaId: string) {
-        const credDefTx = await this.credDefRegistryContract.registerCredDef!(schemaId, "default", this.PRIVATE_KEY);
+         const sigParams = BBSPlusSignatureParamsG1.generate(
+            (await this.getSchemaAttributes(schemaId)).length + 1, // +1 for the trailing revocationId (K_HANDLE)
+            this.stringToBytes(schemaId), //az aláírás paramétere a schemaID
+        );
+        const issuerKp = BBSPlusKeypairG2.generate(sigParams);
+        this.issuer_kp=issuerKp;
+        const issuerSk = issuerKp.secretKey;
+        const issuerPk = issuerKp.publicKey;
+
+        const credDefTx = await this.credDefRegistryContract.registerCredDef!(schemaId, "default", this.bytesToHex(issuerPk.bytes), this.bytesToHex(sigParams.toBytes()));
         const credDefReceipt = await credDefTx.wait();
         const credDefEvent = this.credDefRegistryContract.interface.parseLog(credDefReceipt?.logs[0]!);
         const creddefId = credDefEvent?.args[0]; // credDefId az első argument
         this.addCredDefToTree(schemaId, creddefId!);
         //return this.creddefId;
+    }
+
+    async getSchemaAttributes(schemaId: string): Promise<string[]> {
+        const schema = await this.schemaRegistryContract.getSchema!(schemaId);
+        return schema.attributeNames;
     }
 
     async revocationRegistry(credDefId: string) {
@@ -385,10 +400,10 @@ export class Issuer {
         try {
             const accumulator = await this.getOnChainAccumulator();
             const witness = await accumulator!.membershipWitness(m1, this.accu_private_key, this.state); //holder oldalon legyen egy accumulator proving key
-            const w1 = Witness.vbAccumulatorMembership(m1, witness);
+            const private_witness = Witness.vbAccumulatorMembership(m1, witness); 
             console.log("Membership witness for " + credId + ": ", witness);
-            this.witnesses.set(credId, { witness, w1 });
-            return { witness, w1 };
+            this.witnesses.set(credId, { witness, w1: private_witness });
+            return { witness, w1: private_witness };
         } catch (e) {
             throw new Error("credential is revoked, cannot generate witness");
             return null;
@@ -429,17 +444,43 @@ export class Issuer {
         );
     }
 
+    async getIssuerPublicKey(credDefId: string): Promise<BBSPlusPublicKeyG2 | null> {
+        const credDef = await this.credDefRegistryContract.getCredDef!(credDefId);
+        const publicKeyMaterial: string = credDef.publicKeyMaterial;
+        if (!publicKeyMaterial || publicKeyMaterial === '0x' || publicKeyMaterial.length <= 2) {
+            return null;
+        }
+        const bytes = Uint8Array.from(Buffer.from(publicKeyMaterial.slice(2), 'hex'));
+        return new BBSPlusPublicKeyG2(bytes);
+    }
+
+    async getIssuerParams(credDefId: string): Promise<BBSPlusSignatureParamsG1 | null> {
+        const credDef = await this.credDefRegistryContract.getCredDef!(credDefId);
+        const signParams: string = credDef.signParams;
+        if (!signParams || signParams === '0x' || signParams.length <= 2) {
+            return null;
+        }
+        const bytes = Uint8Array.from(Buffer.from(signParams.slice(2), 'hex'));
+        const value = BBSPlusSignatureParamsG1.valueFromBytes(bytes);
+        return new BBSPlusSignatureParamsG1(value);
+    }
+
     async signCredential(credId: string,  messages: string[], witness1: {witness: VBMembershipWitness; w1: Uint8Array<ArrayBufferLike>;} | null,  message_count: number) {
         const y = await this.findYByCredId(credId);
+        const registryId = await this.findRegistryIdByCredId(credId);
+        const credDefId = this.findCredDefIdByRegistry(registryId!);
+        const schemaId = this.findSchemaIdByCredDef(credDefId!);
         const m1 = Accumulator.encodePositiveNumberAsAccumulatorMember(y!);
         
-        const sigParams = BBSPlusSignatureParamsG1.generate(
+        /*const sigParams = BBSPlusSignatureParamsG1.generate(
             message_count,
             this.stringToBytes('issuer-sig-params-v1'),
         );
         const issuerKp = BBSPlusKeypairG2.generate(sigParams);
         const issuerSk = issuerKp.secretKey;
-        const issuerPk = issuerKp.publicKey;
+        const issuerPk = issuerKp.publicKey;*/
+        const sigParams = (await this.getIssuerParams(credDefId!));
+        const issuerPk = this.issuer_kp.publicKey;
 
         const encB = (s: string) => Accumulator.encodeBytesAsAccumulatorMember(this.stringToBytes(s));
         // encode every caller-supplied message, then append the revocationId as the final element (the K_HANDLE)
@@ -447,18 +488,16 @@ export class Issuer {
             ...messages.map(m => encB(m)),
             m1,
         ];
-        const sig1 = BBSPlusSignatureG1.generate(cred1Messages, issuerSk, sigParams, false);
+        const sig1 = BBSPlusSignatureG1.generate(cred1Messages, this.issuer_kp.secretKey, sigParams!, false);
 
         if (!witness1) {
             throw new Error('cred1 membership witness is not available');
         }
 
         const k_handler = cred1Messages.length - 1; //revocationId index, ami a K_HANDLE lesz a proofban
-        this.signResults.set(credId, { sig1, cred1Messages, issuerPk, sigParams, k_handler, message_count });
-        const registryId = await this.findRegistryIdByCredId(credId);
-        const credDefId = this.findCredDefIdByRegistry(registryId!);
-        const schemaId = this.findSchemaIdByCredDef(credDefId!);
-        this.credentialHolders.get(credId)?.setCredential(credId, schemaId!, credDefId!, registryId!, y!, sig1, cred1Messages, issuerPk, sigParams, k_handler, message_count, witness1.witness, witness1.w1, this.starterBlock.get(credId)!);
+        this.signResults.set(credId, { sig1, cred1Messages, issuerPk, sigParams: sigParams!, k_handler, message_count });
+
+        this.credentialHolders.get(credId)?.setCredential(credId, schemaId!, credDefId!, registryId!, y!, sig1, cred1Messages, issuerPk, sigParams!, k_handler, message_count, witness1.witness, witness1.w1, this.starterBlock.get(credId)!);
         console.log("\nw1: ", witness1.w1, "\n");
         //return { sig1, cred1Messages, issuerPk, sigParams, k_handler, message_count};
     }
@@ -482,7 +521,7 @@ export class Issuer {
         ];
 
         try{
-            const isValid = signature.verify(credMessages, issuerPk, sigParams, false).verified;
+            const isValid = signature.verify(credMessages, issuerPk, sigParams!, false).verified;
             return isValid;
         }
         catch(e){

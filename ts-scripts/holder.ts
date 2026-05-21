@@ -32,19 +32,20 @@ import { VBWitnessUpdateInfo, WitnessUpdateInfo } from '@docknetwork/crypto-wasm
 //const MESSAGE_COUNT = 5;
 //const K_HANDLE = 4;
 
-type Credential = {
+//type CredentialRecord
+type Credential = { //csoportosítom a szükséges adatokat
     schemaId: string;
     credDefId: string;
     registryId: string;
-    y: number;
+    y: number;  //---> ez menjen külön
     signature: BBSPlusSignatureG1;
     messages: Uint8Array[];
-    issuerPk: BBSPlusPublicKeyG2;
+    issuerPk: BBSPlusPublicKeyG2;  //lekéri a credDefből
     sigParams: BBSPlusSignatureParamsG1;
     k_handle: number;
     message_count: number;
     witness: VBMembershipWitness;
-    w: Uint8Array<ArrayBufferLike>;
+    private_witness: Uint8Array<ArrayBufferLike>;
     epoch: number;
     lastSyncedBlock: number;
 }
@@ -143,7 +144,7 @@ export class Holder {
         //const nonce = this.stringToBytes('nonce1');
         const proof = CompositeProof.generate(proofSpec, witnesses, this.nonce);
         console.log("Generated proof for cred1.");
-        await verifier.setProofInfo(credId, proof, revealedMsgs, credential.schemaId, credential.credDefId, credential.registryId, this.nonce);
+        await verifier.setProofInfo(credId, proof, revealedMsgs, credential.schemaId, credential.credDefId, credential.registryId, this.nonce, this.provingKey);
         return proof;
     }
 
@@ -261,7 +262,7 @@ export class Holder {
                 credential.lastSyncedBlock = event.blockNumber;
             }
             credential.witness = witness1;
-            credential.w = Witness.vbAccumulatorMembership(m, witness1);
+            credential.private_witness = Witness.vbAccumulatorMembership(m, witness1);
         }
         catch(CannotBeZero)
         {
@@ -305,7 +306,7 @@ export class Holder {
             k_handle,
             message_count,
             witness,
-            w,
+            private_witness: w,
             epoch: 0,
             lastSyncedBlock: lastSyncedBlock
         };

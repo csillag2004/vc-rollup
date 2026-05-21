@@ -254,3 +254,15 @@ Then("Verifier has proof for {string}", async function (credIs) {
    const proof = await this.verifier.getProof(credIs);
    assert.ok(proof, "Verifier should have proof.") 
 });
+
+//25.
+Then("Verifier verifies proof successfully for {string}", async function (credId) {
+    const isValid = await this.verifier.buildCompositeProof(credId);
+    assert.ok(isValid, `Verifier should successfully verify proof for ${credId}`);
+});
+
+//26.
+Then("Verifier does not verify proof successfully for {string}", async function (credId) {
+    const isValid = await this.verifier.buildCompositeProof(credId);
+    assert.ok(!isValid, `Verifier should not successfully verify proof for ${credId}`);
+});

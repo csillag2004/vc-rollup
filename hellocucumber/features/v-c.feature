@@ -13,7 +13,7 @@ Feature: Verifiable Credential issuance and proof verification
     When the Issuer registers a schema with name "Degree", version "first-version" and attributes "studentName, university, degree, graduationYear"
     Then the schema is registered successfully
   
-  @issuer
+  @issuer @4
    Scenario: 4. Create credential
     Given the Issuer create an accumulator 
     And the Issuer registers a schema with name "Degree", version "first-version" and attributes "studentName, university, degree, graduationYear" 
@@ -25,7 +25,7 @@ Feature: Verifiable Credential issuance and proof verification
     And the accumulator is changed
     And state has "cred1"
 
-  @issuer
+  @issuer @5
   Scenario: 5. Add more credentials
     Given the Issuer create an accumulator 
     And the Issuer registers a schema with name "Degree", version "first-version" and attributes "studentName, university, degree, graduationYear" 
@@ -53,7 +53,7 @@ Feature: Verifiable Credential issuance and proof verification
     And state has "cred2"
     And state has "cred3"
 
-  @issuer
+  @issuer @6
   Scenario: 6. duplicate credential
     Given the Issuer create an accumulator 
     And the Issuer registers a schema with name "Degree", version "first-version" and attributes "studentName, university, degree, graduationYear" 
@@ -66,7 +66,7 @@ Feature: Verifiable Credential issuance and proof verification
     And state has "cred1"
     And the Issuer issues credential "cred1" again
 
-  @issuer 
+  @issuer @7
   Scenario: 7. Revoke credential
     Given the Issuer create an accumulator 
     And the Issuer registers a schema with name "Degree", version "first-version" and attributes "studentName, university, degree, graduationYear" 
@@ -84,7 +84,7 @@ Feature: Verifiable Credential issuance and proof verification
     And state has "cred1"
     And state has "cred3"
 
-  @issuer
+  @issuer @8
   Scenario: 8. Revoke non-existing credential
     Given the Issuer create an accumulator 
     And the Issuer registers a schema with name "Degree", version "first-version" and attributes "studentName, university, degree, graduationYear" 
@@ -102,7 +102,7 @@ Feature: Verifiable Credential issuance and proof verification
     And state has "cred2"
     And state has "cred3"
 
-  @issuer
+  @issuer @9
   Scenario: 9. Revoke already revoked credential
     Given the Issuer create an accumulator
     And the Issuer registers a schema with name "Degree", version "first-version" and attributes "studentName, university, degree, graduationYear"
@@ -125,7 +125,7 @@ Feature: Verifiable Credential issuance and proof verification
     And state has "cred1"
     And state has "cred3"
 
-  @issuer
+  @issuer @10
   Scenario: 10. Create witness
     Given the Issuer create an accumulator
     And the Issuer registers a schema with name "Degree", version "first-version" and attributes "studentName, university, degree, graduationYear"
@@ -137,7 +137,7 @@ Feature: Verifiable Credential issuance and proof verification
     Then the witness is valid for "cred1"
 
 
-  @issuer
+  @issuer @11
   Scenario: 11. Create witness after revocation
     Given the Issuer create an accumulator
     And the Issuer registers a schema with name "Degree", version "first-version" and attributes "studentName, university, degree, graduationYear"
@@ -150,7 +150,7 @@ Feature: Verifiable Credential issuance and proof verification
 
     Then the witness is not created for "cred1"
 
-  @issuer
+  @issuer @12
   Scenario: 12. Witness is invalid after accumulator change
     Given the Issuer create an accumulator
     And the Issuer registers a schema with name "Degree", version "first-version" and attributes "studentName, university, degree, graduationYear"
@@ -167,7 +167,7 @@ Feature: Verifiable Credential issuance and proof verification
 
     Then the witness is valid for "cred1"
 
-  @issuer
+  @issuer @13
   Scenario: 13. Sign credential
     Given the Issuer create an accumulator
     And the Issuer registers a schema with name "Degree", version "first-version" and attributes "studentName, university, degree, graduationYear"
@@ -181,7 +181,7 @@ Feature: Verifiable Credential issuance and proof verification
     Then the signature for "cred1" is valid for messages "Alice, MIT, PhD, 2024"
   
 
-  @issuer
+  @issuer @14
   Scenario: 14. Verify sign with wrong messenge
     Given the Issuer create an accumulator
     And the Issuer registers a schema with name "Degree", version "first-version" and attributes "studentName, university, degree, graduationYear"
@@ -327,7 +327,7 @@ Feature: Verifiable Credential issuance and proof verification
 
     Then the proof is not created successfully for "cred1"
 
-  @run @verifier
+  @24 @verifier
   Scenario: 24. Verifier get proof datas
     Given the Issuer create an accumulator
     And the Issuer registers a schema with name "Degree", version "first-version" and attributes "studentName, university, degree, graduationYear"
@@ -341,6 +341,39 @@ Feature: Verifiable Credential issuance and proof verification
 
     Then the proof is created successfully for "cred1"
     And Verifier has proof for "cred1"
+
+  @verifier @25
+  Scenario: 25. Verifier verify proof
+    Given the Issuer create an accumulator
+    And the Issuer registers a schema with name "Degree", version "first-version" and attributes "studentName, university, degree, graduationYear"
+    And the Issuer creates a credential definition for the registered schema
+    And the issuer creates a revocation registry for the credential definition
+    And the Issuer issues credential "cred1"
+    And the Issuer creates the first witness for "cred1"
+    And the Issuer signs credential "cred1" with messages "Alice, MIT, PhD, 2024"
+
+    When the Holder has credential "cred1"
+
+    Then the proof is created successfully for "cred1"
+    And Verifier has proof for "cred1"
+    And Verifier verifies proof successfully for "cred1"
+
+  @verifier @26
+  Scenario: 26. Verifier verify proof for revoked credential - before update
+    Given the Issuer create an accumulator
+    And the Issuer registers a schema with name "Degree", version "first-version" and attributes "studentName, university, degree, graduationYear"
+    And the Issuer creates a credential definition for the registered schema
+    And the issuer creates a revocation registry for the credential definition
+    And the Issuer issues credential "cred1"
+    And the Issuer creates the first witness for "cred1"
+    And the Issuer signs credential "cred1" with messages "Alice, MIT, PhD, 2024"
+
+    When the Holder has credential "cred1"
+
+    Then the proof is created successfully for "cred1"
+    And Verifier has proof for "cred1"
+    And the Issuer revokes "cred1"
+    And Verifier does not verify proof successfully for "cred1"
 
 
 

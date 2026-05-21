@@ -8,6 +8,7 @@ contract CredDefRegistry{
         bytes32 schemaId;
         string tag;
         bytes publicKeyMaterial;   // BBS+ public key, stored as opaque bytes
+        bytes signParams;
         uint256 createdAt;
     }
 
@@ -24,11 +25,13 @@ contract CredDefRegistry{
     function registerCredDef(
         bytes32 schemaId,
         string calldata tag,
-        bytes calldata publicKeyMaterial
+        bytes calldata publicKeyMaterial,
+        bytes calldata signParams
     ) external returns (bytes32 credDefId){
         //revertek
         if (bytes(tag).length==0) revert("Tag is empty.");
         if (publicKeyMaterial.length == 0) revert("PublicKeyMaterial is empty.");
+        if (signParams.length == 0) revert ("SignParams is empty");
         try schemaRegistry.getSchema(schemaId) {
             // létezik, mehet tovább
         } catch {
@@ -48,6 +51,7 @@ contract CredDefRegistry{
         c.schemaId = schemaId;
         c.tag = tag;
         c.publicKeyMaterial = publicKeyMaterial;
+        c.signParams = signParams;
         c.createdAt = block.timestamp;
 
         //event kiküldés
