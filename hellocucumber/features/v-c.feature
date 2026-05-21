@@ -359,7 +359,7 @@ Feature: Verifiable Credential issuance and proof verification
     And Verifier verifies proof successfully for "cred1"
 
   @verifier @26
-  Scenario: 26. Verifier verify proof for revoked credential - before update
+  Scenario: 26. Verifier verify proof for revoked credential
     Given the Issuer create an accumulator
     And the Issuer registers a schema with name "Degree", version "first-version" and attributes "studentName, university, degree, graduationYear"
     And the Issuer creates a credential definition for the registered schema
@@ -374,6 +374,25 @@ Feature: Verifiable Credential issuance and proof verification
     And Verifier has proof for "cred1"
     And the Issuer revokes "cred1"
     And Verifier does not verify proof successfully for "cred1"
+
+
+  @verifier @27
+  Scenario: 27. Verifier verify proof with changed accumulator
+    Given the Issuer create an accumulator
+    And the Issuer registers a schema with name "Degree", version "first-version" and attributes "studentName, university, degree, graduationYear"
+    And the Issuer creates a credential definition for the registered schema
+    And the issuer creates a revocation registry for the credential definition
+    And the Issuer issues credential "cred1"
+    And the Issuer creates the first witness for "cred1"
+    And the Issuer signs credential "cred1" with messages "Alice, MIT, PhD, 2024"
+
+    When the Holder has credential "cred1"
+    And the Holder updates witness for "cred1"
+
+    Then the proof is created successfully for "cred1"
+    And Verifier has proof for "cred1"
+    And the Issuer issues credential "cred2"
+    And Verifier verifies proof successfully for "cred1"
 
 
 
