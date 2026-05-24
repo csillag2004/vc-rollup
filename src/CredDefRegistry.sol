@@ -1,44 +1,46 @@
 pragma solidity ^0.8.24;
 import {SchemaRegistry} from "./SchemaRegistry.sol";
 
+interface IEthereumDIDRegistry {
+    function identityOwner(address identity) external view returns (address);
+}
+
 contract CredDefRegistry{
 
     struct CredDef {
         address issuer;
         bytes32 schemaId;
         string tag;
-        bytes publicKeyMaterial;   // BBS+ public key, stored as opaque bytes
-        bytes signParams;
         uint256 createdAt;
     }
 
     mapping(bytes32 => CredDef) private creddefs;
 
     SchemaRegistry public schemaRegistry;
+    IEthereumDIDRegistry public didRegistry;
 
-    constructor(address _schemaRegistry) {
+    constructor(address _schemaRegistry, address _didRegistry) {
         schemaRegistry = SchemaRegistry(_schemaRegistry);
+        didRegistry = IEthereumDIDRegistry(_didRegistry);
     }
 
     event CredDefRegistered(bytes32 indexed credDefId, address indexed issuer, bytes32 indexed schemaId, string tag);
 
     function registerCredDef(
+        address issuer,
         bytes32 schemaId,
-        string calldata tag,
-        bytes calldata publicKeyMaterial,
-        bytes calldata signParams
+        string calldata tag
     ) external returns (bytes32 credDefId){
         //revertek
         if (bytes(tag).length==0) revert("Tag is empty.");
-        if (publicKeyMaterial.length == 0) revert("PublicKeyMaterial is empty.");
-        if (signParams.length == 0) revert ("SignParams is empty");
+        require(didRegistry.identityOwner(issuer)==msg.sender, "Not the DID controller");
         try schemaRegistry.getSchema(schemaId) {
             // létezik, mehet tovább
         } catch {
             revert("This schema does not exist.");
         }
     
-        credDefId = keccak256(abi.encodePacked(msg.sender, schemaId, tag));
+        credDefId = keccak256(abi.encodePacked(issuer, schemaId, tag));
 
         //ha már létezik revert
         if (creddefs[credDefId].createdAt != 0){
@@ -47,15 +49,13 @@ contract CredDefRegistry{
 
         //létrehozás
         CredDef storage c = creddefs[credDefId];
-        c.issuer = msg.sender;
+        c.issuer = issuer;
         c.schemaId = schemaId;
         c.tag = tag;
-        c.publicKeyMaterial = publicKeyMaterial;
-        c.signParams = signParams;
         c.createdAt = block.timestamp;
 
         //event kiküldés
-        emit CredDefRegistered(credDefId, msg.sender, schemaId, tag);
+        emit CredDefRegistered(credDefId, issuer, schemaId, tag);
 
         return credDefId;
     }

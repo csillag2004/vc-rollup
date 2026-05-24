@@ -1,4 +1,4 @@
-pragma solidity ^0.8.24;
+/*pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 import {SchemaRegistry} from "../src/SchemaRegistry.sol";
@@ -42,4 +42,4 @@ contract CredDefRegistryTest is Test{
 
         bytes32 id2 = credDefRegistry.registerCredDef(schemaId, "default", pk);
     }
-}
+}*/

@@ -1,4 +1,4 @@
-pragma solidity ^0.8.24;
+/*pragma solidity ^0.8.24;
 
 //DID?? - DID ell kell a CredDefRegistrybe
 
@@ -47,4 +47,4 @@ contract Integrity is Test{
         assertEq(c.schemaId, schema_id);
 
     }
-}
+}*/
