@@ -392,7 +392,7 @@ Feature: Verifiable Credential issuance and proof verification
     Then the proof is created successfully for "cred1"
     And Verifier has proof for "cred1"
     And the Issuer issues credential "cred2"
-    And Verifier verifies proof successfully for "cred1"
+    And Verifier does not verify proof successfully for "cred1"
 
 
 
