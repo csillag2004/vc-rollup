@@ -215,13 +215,18 @@ async function buildState() {
   if (hMap) {
     for (const [credId, cred] of hMap.entries()) {
       const sigHex = cred?.signature?.value ? hexOf(cred.signature.value) : null;
+      // `cred.private_witness` is an opaque Witness instance from
+      // crypto-wasm-ts, not a Uint8Array (the type annotation in
+      // holder.ts:48 is misleading). Hex-encoding it crashes Buffer.from
+      // with "Received an instance of Object", so we just record its
+      // presence as a flag.
       holderInbox[credId] = {
         credId,
         holderName: meta.holderName.get(credId) || '',
         schemaId:   cred.schemaId,
         attributeValues: meta.attrValues.get(credId) || [],
         signature:  sigHex || '0x',
-        witnessBytes: cred.private_witness ? hexOf(cred.private_witness) : null,
+        hasWitness: cred.private_witness != null,
         epoch:      cred.epoch,
         witnessSynced: !meta.revoked.has(credId),
       };
@@ -377,6 +382,10 @@ const handlers: Record<string, (v: any) => Promise<RunResult>> = {
     if (!attrValues) throw new Error('no attribute values on file — re-issue this credential');
     // Re-derive message_count the same way the cucumber step does:
     // messageList.length + 1 (the +1 is the trailing revocationId / K_HANDLE)
+    console.log("id: ", v.credId);
+    console.log("witness: ", witnessPair);
+    console.log("attr: ", attrValues);
+    console.log("num: ", attrValues.length+1);
     await issuer.signCredential(v.credId, attrValues, witnessPair, attrValues.length + 1);
     meta.signed.add(v.credId);
     return { log: [

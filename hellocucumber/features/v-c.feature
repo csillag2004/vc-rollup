@@ -194,7 +194,7 @@ Feature: Verifiable Credential issuance and proof verification
     Then the signature for "cred1" is not valid for messages "Alice, MIT, Bachelor's, 2024"
 
 
-  @issuer
+  @issuer @15
   Scenario: 15. Verify sign with wrong number of messages
     Given the Issuer create an accumulator
     And the Issuer registers a schema with name "Degree", version "first-version" and attributes "studentName, university, degree, graduationYear"
