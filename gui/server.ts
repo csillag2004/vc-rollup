@@ -15,6 +15,7 @@ import * as http from 'http';
 import * as fs from 'fs';
 import * as path from 'path';
 import { ethers } from 'ethers';
+import { initializeWasm } from '@docknetwork/crypto-wasm-ts';
 
 import { Issuer } from '../ts-scripts/issuer';
 import { Holder } from '../ts-scripts/holder';
@@ -27,6 +28,58 @@ import { Verifier } from '../ts-scripts/verifier';
 let issuer   = new Issuer();
 let holder   = new Holder();
 let verifier = new Verifier();
+hookTxCapture();
+
+// ─────────────────────────────────────────────────────────────────────
+// Real-tx-hash capture
+// Each actor's contracts share one JsonRpcProvider. We monkey-patch each
+// provider's `send` so that every `eth_sendRawTransaction` it dispatches
+// pushes the resulting hash into an active sink. A handler sets the sink
+// before invoking the logic-layer call and clears it after; the run loop
+// then decorates each `kind: 'tx'` log line with the next captured hash
+// in order. The logic layer itself is unmodified — we just observe the
+// underlying provider.
+// ─────────────────────────────────────────────────────────────────────
+let activeTxSink: ((hash: string, actor: string) => void) | null = null;
+
+function pickProvider(actor: any): ethers.JsonRpcProvider | null {
+  // Any of the actor's *Contract fields work — they all share one wallet
+  // and therefore one provider.
+  for (const k of Object.keys(actor)) {
+    if (k.endsWith('Contract')) {
+      const c = actor[k];
+      const p = c?.runner?.provider;
+      if (p && typeof p.send === 'function') return p;
+    }
+  }
+  return null;
+}
+
+function wrapProvider(p: ethers.JsonRpcProvider, actorName: string) {
+  const tagged = p as any;
+  if (tagged.__guiPatched) return; // idempotent across resets
+  const orig = p.send.bind(p);
+  tagged.send = async function (method: string, params: any[]) {
+    const result = await orig(method, params);
+    if (
+      method === 'eth_sendRawTransaction' &&
+      typeof result === 'string' &&
+      result.startsWith('0x') &&
+      activeTxSink
+    ) {
+      activeTxSink(result, actorName);
+    }
+    return result;
+  };
+  tagged.__guiPatched = true;
+}
+
+function hookTxCapture() {
+  for (const [name, actor] of [['issuer', issuer], ['holder', holder], ['verifier', verifier]] as const) {
+    const p = pickProvider(actor);
+    if (p) wrapProvider(p, name);
+  }
+}
 
 // GUI-only metadata. The logic layer does not track these.
 type Meta = {
@@ -216,9 +269,13 @@ const handlers: Record<string, (v: any) => Promise<RunResult>> = {
 
   async initAccumulator() {
     await issuer.createAccumulator();
+    // Three on-chain txs are emitted, in this order:
+    // 1) Accumulator.setAccumulator(),  2) Accumulator.setParams(),  3) Accumulator.setPublicKey().
     return { log: [
       { kind: 'info', actor: 'issuer', msg: 'generate VB-accumulator params + keypair' },
-      { kind: 'tx',   actor: 'issuer', msg: 'Accumulator.setAccumulator() / setParams() / setPublicKey() confirmed' },
+      { kind: 'tx',   actor: 'issuer', msg: 'Accumulator.setAccumulator()' },
+      { kind: 'tx',   actor: 'issuer', msg: 'Accumulator.setParams()' },
+      { kind: 'tx',   actor: 'issuer', msg: 'Accumulator.setPublicKey()' },
       { kind: 'ok',   actor: 'issuer', msg: 'accumulator live on Scroll Sepolia' },
     ]};
   },
@@ -239,11 +296,12 @@ const handlers: Record<string, (v: any) => Promise<RunResult>> = {
 
   async registerCredDef(v) {
     if (!v.schemaId) throw new Error('schema is required');
-    // Tag is informational on the GUI; the logic layer hardcodes "default".
+    // Two on-chain txs: EthereumDIDRegistry.setAttribute() then CredDefRegistry.registerCredDef().
     const id = await issuer.credDefId(v.schemaId);
     return { log: [
       { kind: 'info', actor: 'issuer', msg: 'BBS+G2 keypair attribute published to the DID registry' },
-      { kind: 'tx',   actor: 'issuer', msg: 'CredDefRegistry.registerCredDef() confirmed' },
+      { kind: 'tx',   actor: 'issuer', msg: 'EthereumDIDRegistry.setAttribute(BBS+ pubkey)' },
+      { kind: 'tx',   actor: 'issuer', msg: 'CredDefRegistry.registerCredDef()' },
       { kind: 'ok',   actor: 'issuer', msg: `credDefId minted ${String(id).slice(0, 18)}…` },
     ]};
   },
@@ -252,7 +310,7 @@ const handlers: Record<string, (v: any) => Promise<RunResult>> = {
     if (!v.credDefId) throw new Error('credDef is required');
     await issuer.revocationRegistry(v.credDefId);
     return { log: [
-      { kind: 'tx', actor: 'issuer', msg: 'RevocationRegistry.createRegistry() confirmed' },
+      { kind: 'tx', actor: 'issuer', msg: 'RevocationRegistry.createRegistry()' },
       { kind: 'ok', actor: 'issuer', msg: 'registry wired to accumulator' },
     ]};
   },
@@ -280,8 +338,8 @@ const handlers: Record<string, (v: any) => Promise<RunResult>> = {
 
     return { log: [
       { kind: 'info', actor: 'issuer', msg: `assign y(${v.credId}) — random scalar member` },
-      { kind: 'tx',   actor: 'issuer', msg: 'RevocationRegistry.updateRegistry(adds=[y]) confirmed' },
-      { kind: 'tx',   actor: 'issuer', msg: 'Accumulator.setAccumulator(post-add) confirmed' },
+      { kind: 'tx',   actor: 'issuer', msg: 'RevocationRegistry.updateRegistry(adds=[y])' },
+      { kind: 'tx',   actor: 'issuer', msg: 'Accumulator.setAccumulator(post-add)' },
       { kind: 'ok',   actor: 'issuer', msg: `credential ${v.credId} (${v.holderName}) issued` },
     ]};
   },
@@ -295,8 +353,8 @@ const handlers: Record<string, (v: any) => Promise<RunResult>> = {
     const hn = meta.holderName.get(v.credId) || '';
     return { log: [
       { kind: 'warn', actor: 'issuer', msg: `remove y(${v.credId}) from accumulator state` },
-      { kind: 'tx',   actor: 'issuer', msg: 'Accumulator.setAccumulator(post-remove) confirmed' },
-      { kind: 'tx',   actor: 'issuer', msg: 'RevocationRegistry.updateRegistry(removes=[y]) confirmed' },
+      { kind: 'tx',   actor: 'issuer', msg: 'Accumulator.setAccumulator(post-remove)' },
+      { kind: 'tx',   actor: 'issuer', msg: 'RevocationRegistry.updateRegistry(removes=[y])' },
       { kind: 'ok',   actor: 'issuer', msg: `${v.credId}${hn ? ' (' + hn + ')' : ''} revoked` },
     ]};
   },
@@ -462,6 +520,7 @@ const server = http.createServer(async (req, res) => {
       issuer = new Issuer();
       holder = new Holder();
       verifier = new Verifier();
+      hookTxCapture();
       meta.attrValues.clear();
       meta.holderName.clear();
       meta.revoked.clear();
@@ -479,12 +538,40 @@ const server = http.createServer(async (req, res) => {
       if (!handler) return sendJson(res, 404, { error: `unknown command: ${id}` });
       const body = await readJsonBody(req);
       console.log(`[${new Date().toLocaleTimeString()}] → ${id}`, body);
+
+      // Capture every tx hash the actors dispatch during this handler so we
+      // can attach it to the matching `kind: 'tx'` log line.
+      const capturedHashes: string[] = [];
+      activeTxSink = (hash) => { capturedHashes.push(hash); };
+
       try {
         const out = await handler(body);
+        activeTxSink = null;
+
+        // Decorate the handler's tx lines with the real hashes, in order.
+        // If the handler emitted fewer tx lines than there were sends (or
+        // vice versa) the extra ones are appended/ignored gracefully.
+        let hi = 0;
+        const decoratedLog: LogLine[] = out.log.map((line) => {
+          if (line.kind === 'tx' && capturedHashes[hi]) {
+            const ln = { ...line, hash: capturedHashes[hi]! };
+            hi++;
+            return ln;
+          }
+          return line;
+        });
+        // Any extra hashes we didn't pair to a labelled line — surface them
+        // anyway so the user still gets clickable links.
+        while (hi < capturedHashes.length) {
+          decoratedLog.push({ kind: 'tx', actor: 'issuer', msg: 'on-chain tx', hash: capturedHashes[hi]! });
+          hi++;
+        }
+
         const state = await buildState();
-        console.log(`[${new Date().toLocaleTimeString()}] ✓ ${id}`);
-        return sendJson(res, 200, { state, log: out.log });
+        console.log(`[${new Date().toLocaleTimeString()}] ✓ ${id}  (${capturedHashes.length} tx)`);
+        return sendJson(res, 200, { state, log: decoratedLog });
       } catch (e: any) {
+        activeTxSink = null;
         const msg = extractRevert(e) || e?.message || String(e);
         console.error(`[${new Date().toLocaleTimeString()}] ✗ ${id}: ${msg}`);
         return sendJson(res, 200, { error: msg });
@@ -510,9 +597,19 @@ function extractRevert(e: any): string | null {
 }
 
 const PORT = Number(process.env.GUI_PORT) || 3001;
-server.listen(PORT, () => {
-  console.log(`Credential Console bridge listening at http://localhost:${PORT}`);
-  console.log(`  · issuer wallet:   ${ACTOR_ADDR.issuer || '(no PRIVATE_KEY_ISSUER in .env)'}`);
-  console.log(`  · holder wallet:   ${ACTOR_ADDR.holder || '(no PRIVATE_KEY_HOLDER in .env)'}`);
-  console.log(`  · verifier wallet: ${ACTOR_ADDR.verifier || '(no PRIVATE_KEY_VERIFIER in .env)'}`);
+// Initialise the crypto-wasm module before accepting any requests. Without
+// this, BBS+ key/sig param generation throws "WASM module is not initialized"
+// — Issuer.createAccumulator() normally does this, but if the on-chain
+// accumulator already exists the user skips that button and the WASM is
+// never loaded in this Node process.
+initializeWasm().then(() => {
+  server.listen(PORT, () => {
+    console.log(`Credential Console bridge listening at http://localhost:${PORT}`);
+    console.log(`  · issuer wallet:   ${ACTOR_ADDR.issuer || '(no PRIVATE_KEY_ISSUER in .env)'}`);
+    console.log(`  · holder wallet:   ${ACTOR_ADDR.holder || '(no PRIVATE_KEY_HOLDER in .env)'}`);
+    console.log(`  · verifier wallet: ${ACTOR_ADDR.verifier || '(no PRIVATE_KEY_VERIFIER in .env)'}`);
+  });
+}).catch((e) => {
+  console.error('Failed to initialise crypto-wasm:', e);
+  process.exit(1);
 });

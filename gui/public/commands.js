@@ -85,9 +85,9 @@ const COMMANDS = [
     id: 'initAccumulator',
     actor: 'issuer', group: 'Setup',
     label: 'Initialise Accumulator',
-    blurb: 'Generates VB-accumulator params + keypair and publishes them on Scroll Sepolia.',
+    blurb: 'Generates VB-accumulator params + keypair and publishes them on Scroll Sepolia. Running this again overwrites the on-chain accumulator with fresh values — any previously issued credentials become unverifiable.',
     inputs: () => [],
-    canRun: (s) => s.accumulator ? 'already initialised' : null,
+    canRun: () => null,
     run: (s, v) => runOnServer('initAccumulator', v),
   },
 
