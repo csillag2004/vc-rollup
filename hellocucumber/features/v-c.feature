@@ -295,7 +295,7 @@ Feature: Verifiable Credential issuance and proof verification
 
     Then the Holder not has credential "cred1"
 
-  @holder
+  @holder @22
   Scenario: 22. Update witness after revoke
     Given the Issuer create an accumulator
     And the Issuer registers a schema with name "Degree", version "first-version" and attributes "studentName, university, degree, graduationYear"

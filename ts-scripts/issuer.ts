@@ -46,6 +46,7 @@ type SignCredentialResult = {
 };
 
 export class Issuer {
+    private readonly ADDRESS=process.env.ADDRESS_ISSUER!;
     private readonly RPC_URL = 'https://sepolia-rpc.scroll.io';
     private readonly CHAIN_ID = 534351;
     private readonly REGISTRY = process.env.REGISTRY_ADDRESS!;
@@ -61,6 +62,7 @@ export class Issuer {
     private credDefRegistryContract!: ethers.Contract;
     private revocationRegistryContract!: ethers.Contract;
     private accumulatorContract!: ethers.Contract;
+    private didContract!: ethers.Contract;
 
     // FIXME accumulatort nem kéne tárolni az issuerben!!! - solkidityn fel
     //private accumulator!: PositiveAccumulator;
@@ -69,6 +71,7 @@ export class Issuer {
     //private params!: AccumulatorParams;
     private accu_private_key!: AccumulatorSecretKey;
     private issuer_kp!: BBSPlusKeypairG2;
+    private signParams!: BBSPlusSignatureParamsG1;
 
 
     // FIXME ezekből elég 1???? fa-map json
@@ -108,12 +111,17 @@ export class Issuer {
         );
         const artifact_accumulator = JSON.parse(fs.readFileSync(artifactPath4, 'utf-8'));
 
+        const didRegistryAbi = [
+            "function setAttribute(address identity, bytes32 name, bytes value, uint256 validity)"
+        ];
+
         const provider = new ethers.JsonRpcProvider(this.RPC_URL);
         const wallet = new ethers.Wallet(this.PRIVATE_KEY, provider);
         this.schemaRegistryContract = new ethers.Contract(this.SCHEMA_REGISTRY, artifact_schema.abi, wallet);
         this.credDefRegistryContract = new ethers.Contract(this.CREDDEF_REGISTRY, artifact_creddef.abi, wallet);
         this.revocationRegistryContract = new ethers.Contract(this.REVOCATION_REGISTRY, artifact_revocation.abi, wallet);
         this.accumulatorContract = new ethers.Contract(this.ACCUMULATOR_ADDR, artifact_accumulator.abi, wallet);  //le kell nullázni az akkumlátort!!!
+        this.didContract = new ethers.Contract(this.REGISTRY, didRegistryAbi, wallet);
 
         //this.myMap.set('cred1', 1001);
         //this.myMap.set('cred2', 2002);
@@ -302,16 +310,31 @@ export class Issuer {
     }
 
     async credDefId(schemaId: string) {
+        //BBSPlus
          const sigParams = BBSPlusSignatureParamsG1.generate(
             (await this.getSchemaAttributes(schemaId)).length + 1, // +1 for the trailing revocationId (K_HANDLE)
             this.stringToBytes(schemaId), //az aláírás paramétere a schemaID
         );
+        this.signParams = sigParams;
         const issuerKp = BBSPlusKeypairG2.generate(sigParams);
         this.issuer_kp=issuerKp;
         const issuerSk = issuerKp.secretKey;
         const issuerPk = issuerKp.publicKey;
 
-        const credDefTx = await this.credDefRegistryContract.registerCredDef!(schemaId, "default", this.bytesToHex(issuerPk.bytes), this.bytesToHex(sigParams.toBytes()));
+        //update DID
+        const attrName = ethers.encodeBytes32String("did/pub/Bls12381G2/veriKey/hex");
+        const validity = 5 * 60 * 60 * 24 * 365; // 5 év, másodpercben
+        const tx = await this.didContract.setAttribute!(
+            this.ADDRESS,            // identity = a saját DID-je (did:ethr:...:issuerAddress)
+            attrName,
+            this.bytesToHex(issuerPk.bytes),  // value = nyers pubkey bytes
+            validity
+        );
+        await tx.wait();
+
+        //CredDef
+        const keyId = ethers.keccak256(this.bytesToHex(issuerPk.bytes));
+        const credDefTx = await this.credDefRegistryContract.registerCredDef!(schemaId, "default", keyId);
         const credDefReceipt = await credDefTx.wait();
         const credDefEvent = this.credDefRegistryContract.interface.parseLog(credDefReceipt?.logs[0]!);
         const creddefId = credDefEvent?.args[0]; // credDefId az első argument
@@ -444,26 +467,6 @@ export class Issuer {
         );
     }
 
-    async getIssuerPublicKey(credDefId: string): Promise<BBSPlusPublicKeyG2 | null> {
-        const credDef = await this.credDefRegistryContract.getCredDef!(credDefId);
-        const publicKeyMaterial: string = credDef.publicKeyMaterial;
-        if (!publicKeyMaterial || publicKeyMaterial === '0x' || publicKeyMaterial.length <= 2) {
-            return null;
-        }
-        const bytes = Uint8Array.from(Buffer.from(publicKeyMaterial.slice(2), 'hex'));
-        return new BBSPlusPublicKeyG2(bytes);
-    }
-
-    async getIssuerParams(credDefId: string): Promise<BBSPlusSignatureParamsG1 | null> {
-        const credDef = await this.credDefRegistryContract.getCredDef!(credDefId);
-        const signParams: string = credDef.signParams;
-        if (!signParams || signParams === '0x' || signParams.length <= 2) {
-            return null;
-        }
-        const bytes = Uint8Array.from(Buffer.from(signParams.slice(2), 'hex'));
-        const value = BBSPlusSignatureParamsG1.valueFromBytes(bytes);
-        return new BBSPlusSignatureParamsG1(value);
-    }
 
     async signCredential(credId: string,  messages: string[], witness1: {witness: VBMembershipWitness; w1: Uint8Array<ArrayBufferLike>;} | null,  message_count: number) {
         const y = await this.findYByCredId(credId);
@@ -479,7 +482,7 @@ export class Issuer {
         const issuerKp = BBSPlusKeypairG2.generate(sigParams);
         const issuerSk = issuerKp.secretKey;
         const issuerPk = issuerKp.publicKey;*/
-        const sigParams = (await this.getIssuerParams(credDefId!));
+        const sigParams = this.signParams;
         const issuerPk = this.issuer_kp.publicKey;
 
         const encB = (s: string) => Accumulator.encodeBytesAsAccumulatorMember(this.stringToBytes(s));

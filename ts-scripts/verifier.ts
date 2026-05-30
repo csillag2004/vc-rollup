@@ -2,6 +2,8 @@ import 'dotenv/config';
 import { ethers } from 'ethers';
 import * as fs from 'fs';
 import * as path from 'path';
+import { Resolver } from 'did-resolver';
+import { getResolver as getEthrDidResolver } from 'ethr-did-resolver';
 import { InMemoryState } from '../ts-scripts/in-memory-persistence';
 import {
   initializeWasm,
@@ -44,7 +46,10 @@ export class Verifier {
     private readonly SCHEMA_REGISTRY = process.env.SCHEMA_REGISTRY_ADDR!;
     private readonly CREDDEF_REGISTRY = process.env.CREDDEF_REGISTRY_ADDR!;
     //private readonly REVOCATION_REGISTRY = process.env.REVOCATION_REGISTRY_ADDR!;
+    private readonly REGISTRY = process.env.REGISTRY_ADDRESS!;   // EthereumDIDRegistry
     private readonly RPC_URL = 'https://sepolia-rpc.scroll.io';
+    private readonly CHAIN_ID = 534351;                         // Scroll Sepolia
+    private readonly DID_NETWORK = 'scrollSepolia';
 
     private schemaRegistryContract!: ethers.Contract;
     private credDefRegistryContract!: ethers.Contract;
@@ -128,24 +133,52 @@ export class Verifier {
     }
 
     async getIssuerPublicKey(credDefId: string): Promise<BBSPlusPublicKeyG2 | null> {
+        // 1. Look up the CredDef on-chain -> issuer address + keyId (= keccak256 of the BBS+ pubkey)
         const credDef = await this.credDefRegistryContract.getCredDef!(credDefId);
-        const publicKeyMaterial: string = credDef.publicKeyMaterial;
-        if (!publicKeyMaterial || publicKeyMaterial === '0x' || publicKeyMaterial.length <= 2) {
-            return null;
+        const issuer: string = credDef.issuer;
+        const keyId: string = credDef.keyId; // bytes32, 0x-prefixed
+
+        // 2. Resolve the issuer's did:ethr document via ethr-did-resolver
+        const did = `did:ethr:${this.DID_NETWORK}:${issuer}`;
+        const resolver = new Resolver(
+            getEthrDidResolver({
+                networks: [
+                    { name: this.DID_NETWORK, chainId: this.CHAIN_ID, rpcUrl: this.RPC_URL, registry: this.REGISTRY },
+                ],
+            }),
+        );
+        const { didDocument } = await resolver.resolve(did);
+        const verificationMethods = didDocument?.verificationMethod ?? [];
+
+        // 3. Pick the verification method whose published key matches the on-chain keyId.
+        //    This binds the DID-published BBS+ key to the CredDef the issuer registered.
+        for (const vm of verificationMethods) {
+            const hex = this.publicKeyHexFromVerificationMethod(vm);
+            if (!hex) continue;
+            if (ethers.keccak256(hex).toLowerCase() === keyId.toLowerCase()) {
+                return new BBSPlusPublicKeyG2(Uint8Array.from(Buffer.from(hex.slice(2), 'hex')));
+            }
         }
-        const bytes = Uint8Array.from(Buffer.from(publicKeyMaterial.slice(2), 'hex'));
-        return new BBSPlusPublicKeyG2(bytes);
+        return null;
     }
 
-    async getIssuerParams(credDefId: string): Promise<BBSPlusSignatureParamsG1 | null> {
-        const credDef = await this.credDefRegistryContract.getCredDef!(credDefId);
-        const signParams: string = credDef.signParams;
-        if (!signParams || signParams === '0x' || signParams.length <= 2) {
-            return null;
-        }
-        const bytes = Uint8Array.from(Buffer.from(signParams.slice(2), 'hex'));
-        const value = BBSPlusSignatureParamsG1.valueFromBytes(bytes);
-        return new BBSPlusSignatureParamsG1(value);
+    /** Extracts the raw public-key bytes (as a 0x-prefixed hex string) from a DID verification method.
+     *  The issuer publishes the BBS+ key with `hex` encoding (did/pub/Bls12381G2/veriKey/hex). */
+    private publicKeyHexFromVerificationMethod(vm: { publicKeyHex?: string }): string | null {
+        if (!vm.publicKeyHex) return null;
+        return vm.publicKeyHex.startsWith('0x') ? vm.publicKeyHex : '0x' + vm.publicKeyHex;
+    }
+
+    async getIssuerParams(schemaId: string): Promise<BBSPlusSignatureParamsG1 | null> {
+        const sigParams = BBSPlusSignatureParamsG1.generate(
+            (await this.getSchemaAttributes(schemaId)).length + 1, // +1 for the trailing revocationId (K_HANDLE)
+            this.stringToBytes(schemaId), //az aláírás paramétere a schemaID
+        );
+        return sigParams;
+    }
+
+    private stringToBytes(message: string): Uint8Array {
+        return Uint8Array.from(Buffer.from(message, 'utf-8'));
     }
 
     async getSchemaAttributes(schemaId: string): Promise<string[]> {
@@ -160,7 +193,7 @@ export class Verifier {
         //10. Verifier rebuilds statements + metastatements (no witnesses, no signature)
         const verStmts = new Statements();
         verStmts.add(
-            Statement.bbsPlusSignatureVerifierConstantTime((await this.getIssuerParams(proof!.credDefId!))!, (await this.getIssuerPublicKey(proof!.credDefId!))!, proof!.revealedMessages!, false),
+            Statement.bbsPlusSignatureVerifierConstantTime((await this.getIssuerParams(proof!.schemaId!))!, (await this.getIssuerPublicKey(proof!.credDefId!))!, proof!.revealedMessages!, false),
         );
         const accumulator = this.getOnChainAccumulator()
         verStmts.add(
