@@ -213,21 +213,26 @@ async function buildState() {
   const holderInbox: Record<string, any> = {};
   const hMap: Map<string, any> = hx.credentialMap;
   if (hMap) {
-    for (const [credId, cred] of hMap.entries()) {
+    for (const [credId, rec] of hMap.entries()) {
+      // The logic layer now stores a nested CredentialRecord (holder.ts:57):
+      //   { credential: { schemaId, signature, … }, y, witness: { publicWitness,
+      //     privateWitness }, helper: { epoch, … } }
+      // so reach through `rec.credential` / `rec.witness` / `rec.helper`.
+      const cred = rec?.credential ?? rec;
       const sigHex = cred?.signature?.value ? hexOf(cred.signature.value) : null;
-      // `cred.private_witness` is an opaque Witness instance from
+      // `witness.privateWitness` is an opaque Witness instance from
       // crypto-wasm-ts, not a Uint8Array (the type annotation in
-      // holder.ts:48 is misleading). Hex-encoding it crashes Buffer.from
+      // holder.ts is misleading). Hex-encoding it crashes Buffer.from
       // with "Received an instance of Object", so we just record its
       // presence as a flag.
       holderInbox[credId] = {
         credId,
         holderName: meta.holderName.get(credId) || '',
-        schemaId:   cred.schemaId,
+        schemaId:   cred?.schemaId,
         attributeValues: meta.attrValues.get(credId) || [],
         signature:  sigHex || '0x',
-        hasWitness: cred.private_witness != null,
-        epoch:      cred.epoch,
+        hasWitness: rec?.witness?.privateWitness != null,
+        epoch:      rec?.helper?.epoch,
         witnessSynced: !meta.revoked.has(credId),
       };
     }
@@ -237,12 +242,15 @@ async function buildState() {
   const proofs: any[] = [];
   const vMap: Map<string, any> = vx.proofinfo;
   if (vMap) {
-    for (const [credId, p] of vMap.entries()) {
+    for (const [credId, rec] of vMap.entries()) {
+      // proofinfo now holds a PresentationRecord (verifier.ts:43) whose
+      // schema/credDef/registry ids live under `.presentation`.
+      const p = rec?.presentation ?? rec;
       const m = meta.proofMeta.get(credId) || { revealed: [], revealedMap: {}, proofBytes: '0x' };
       proofs.push({
         credId,
         holderName: meta.holderName.get(credId) || '',
-        schemaId:   p.schemaId,
+        schemaId:   p?.schemaId,
         revealed:   m.revealed,
         revealedMap: m.revealedMap,
         proofBytes: m.proofBytes,
@@ -441,7 +449,7 @@ const handlers: Record<string, (v: any) => Promise<RunResult>> = {
     const result = await verifier.buildCompositeProof(v.credId);
     const isValid = !!(result && (result as any).verified);
     const m = meta.proofMeta.get(v.credId);
-    const schemaId = (verifier as any).proofinfo?.get(v.credId)?.schemaId || '';
+    const schemaId = (verifier as any).proofinfo?.get(v.credId)?.presentation?.schemaId || '';
     meta.lastVerified = {
       credId: v.credId,
       holderName: meta.holderName.get(v.credId) || '',
