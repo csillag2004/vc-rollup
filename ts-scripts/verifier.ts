@@ -28,14 +28,20 @@ import {
   IntegerType,
   BBSPlusPublicKeyG2,
   AccumulatorPublicKey,
+  Presentation,
 } from '@docknetwork/crypto-wasm-ts';
 
-type ProofInfo ={
-    proof: CompositeProof;
-    revealedMessages: Map<number, Uint8Array>;
+type MyPresentation ={
+    credId: string;
     schemaId: string;
     credDefId: string;
     registryId: string;
+    revealedMessages: Map<number, Uint8Array>;
+    proof: CompositeProof;
+}
+
+type PresentationRecord = {
+    presentation: MyPresentation;
     nonce: Uint8Array<ArrayBufferLike>;
     provingKey: MembershipProvingKey;
 }
@@ -85,7 +91,7 @@ export class Verifier {
         this.accumulatorContract = new ethers.Contract(this.ACCUMULATOR_ADDR, artifact_accumulator.abi, wallet);  //le kell nullázni az akkumlátort!!!
     }
 
-    proofinfo: Map<string, ProofInfo> = new Map();
+    proofinfo: Map<string, PresentationRecord> = new Map();
 
     async setProofInfo(
         credId: string,
@@ -96,10 +102,23 @@ export class Verifier {
         registryId: string,
         nonce: Uint8Array<ArrayBufferLike>,
         prove: MembershipProvingKey){
-        const proofinfo: ProofInfo = {
-            proof, revealedMessages, schemaId, credDefId, registryId, nonce, provingKey: prove
-        };
-        this.proofinfo.set(credId, proofinfo)
+
+        const present : MyPresentation = {
+            credId: credId,
+            schemaId: schemaId,
+            credDefId: credDefId,
+            registryId: registryId,
+            revealedMessages: revealedMessages,
+            proof: proof
+        }
+
+        const record : PresentationRecord = {
+            presentation: present,
+            nonce: nonce,
+            provingKey: prove
+        } 
+
+        this.proofinfo.set(credId, record)
     }
 
     getProof(credId: string){
@@ -193,7 +212,7 @@ export class Verifier {
         //10. Verifier rebuilds statements + metastatements (no witnesses, no signature)
         const verStmts = new Statements();
         verStmts.add(
-            Statement.bbsPlusSignatureVerifierConstantTime((await this.getIssuerParams(proof!.schemaId!))!, (await this.getIssuerPublicKey(proof!.credDefId!))!, proof!.revealedMessages!, false),
+            Statement.bbsPlusSignatureVerifierConstantTime((await this.getIssuerParams(proof!.presentation.schemaId!))!, (await this.getIssuerPublicKey(proof!.presentation.credDefId!))!, proof!.presentation.revealedMessages!, false),
         );
         const accumulator = this.getOnChainAccumulator()
         verStmts.add(
@@ -202,13 +221,13 @@ export class Verifier {
             )
         );
         const eqV = new WitnessEqualityMetaStatement();
-        eqV.addWitnessRef(0, (await this.getSchemaAttributes(proof!.schemaId!)).length); //kell egy új függvény, ami visszaadja, hogy hány attribútuma van a schemának
+        eqV.addWitnessRef(0, (await this.getSchemaAttributes(proof!.presentation.schemaId!)).length); //kell egy új függvény, ami visszaadja, hogy hány attribútuma van a schemának
         eqV.addWitnessRef(1, 0);
         const metaStmtsV = new MetaStatements();
         metaStmtsV.add(MetaStatement.witnessEquality(eqV));
         const verifierSpec = new ProofSpec(verStmts, metaStmtsV);
 
-        const isValid = proof?.proof.verify(verifierSpec, proof.nonce);
+        const isValid = proof?.presentation.proof.verify(verifierSpec, proof.nonce);
         console.log("Proof verification result for cred1: ", isValid);
         return isValid;
     }

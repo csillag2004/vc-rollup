@@ -33,29 +33,43 @@ import { VBWitnessUpdateInfo, WitnessUpdateInfo } from '@docknetwork/crypto-wasm
 //const K_HANDLE = 4;
 
 //type CredentialRecord
-type Credential = { //csoportosítom a szükséges adatokat
-    schemaId: string;
+type Credential = { //cso ,m
+    credId: string
+    schemaId: string,
     credDefId: string;
     registryId: string;
-    y: number;  //---> ez menjen külön
     signature: BBSPlusSignatureG1;
     messages: Uint8Array[];
-    issuerPk: BBSPlusPublicKeyG2;  //lekéri a credDefből
-    sigParams: BBSPlusSignatureParamsG1;
+}
+
+type CredentialHelper = {
     k_handle: number;
     message_count: number;
-    witness: VBMembershipWitness;
-    private_witness: Uint8Array<ArrayBufferLike>;
     epoch: number;
     lastSyncedBlock: number;
+}
+
+type MyWitness = {
+    publicWitness: VBMembershipWitness;
+    privateWitness: Uint8Array<ArrayBufferLike>;
+}
+
+type CredentialRecord = {
+    credential: Credential,
+    y: number,
+    witness: MyWitness,
+    helper: CredentialHelper
+
 }
 
 export class Holder {
     private readonly ACCUMULATOR_ADDR = process.env.ACCUMULATOR_ADDR!;
     private readonly PRIVATE_KEY = process.env.PRIVATE_KEY_HOLDER!;
+    private readonly SCHEMA_REGISTRY = process.env.SCHEMA_REGISTRY_ADDR!;
     private readonly REVOCATION_REGISTRY = process.env.REVOCATION_REGISTRY_ADDR!;
     private readonly RPC_URL = 'https://sepolia-rpc.scroll.io';
 
+    private schemaRegistryContract!: ethers.Contract;
     private revocationRegistryContract!: ethers.Contract;
     private accumulatorContract!: ethers.Contract;
 
@@ -63,7 +77,7 @@ export class Holder {
     private nonce = this.stringToBytes('nonce1');
 
     //az issuer által aláírt credential + witness tárolása a holderben
-    credentialMap: Map<string, Credential> = new Map(); //credId -> Credential
+    credentialMap: Map<string, CredentialRecord> = new Map(); //credId -> Credential
     //private credential: any;
     //private signature: any;
     //private y: any;
@@ -75,6 +89,11 @@ export class Holder {
         );
         const artifact_revocation = JSON.parse(fs.readFileSync(artifactPath, 'utf-8'));
 
+        const artifactPath2 = path.resolve(
+            __dirname, '..', 'out', 'SchemaRegistry.sol', 'SchemaRegistry.json'
+        );
+        const artifact_schema = JSON.parse(fs.readFileSync(artifactPath2, 'utf-8'));
+
         const artifactPath4 = path.resolve(
             __dirname, '..', 'out', 'Accumulator.sol', 'Accumulator.json'
         );
@@ -82,6 +101,7 @@ export class Holder {
 
         const provider = new ethers.JsonRpcProvider(this.RPC_URL);
         const wallet = new ethers.Wallet(this.PRIVATE_KEY, provider);
+        this.schemaRegistryContract = new ethers.Contract(this.SCHEMA_REGISTRY, artifact_schema.abi, wallet);
         this.revocationRegistryContract = new ethers.Contract(this.REVOCATION_REGISTRY, artifact_revocation.abi, wallet);
         this.accumulatorContract = new ethers.Contract(this.ACCUMULATOR_ADDR, artifact_accumulator.abi, wallet);  //le kell nullázni az akkumlátort!!!
 
@@ -99,7 +119,7 @@ export class Holder {
         const credential = this.credentialMap.get(credId);
     }*/
 
-    getCredential(credId: string): Credential | null {
+    getCredential(credId: string): CredentialRecord | null {
         return this.credentialMap.get(credId) || null;
     }
 
@@ -114,7 +134,7 @@ export class Holder {
         const REVEAL = new Set<number>(reveals);
         const revealedMsgs = new Map<number, Uint8Array>();
         const unrevealedMsgs = new Map<number, Uint8Array>();
-        credential.messages.forEach((m, i) =>
+        credential.credential.messages.forEach((m, i) =>
             REVEAL.has(i) ? revealedMsgs.set(i, m) : unrevealedMsgs.set(i, m),
         );
 
@@ -122,7 +142,7 @@ export class Holder {
 
         const proverStmts = new Statements();
         const sBBS = proverStmts.add(
-            Statement.bbsPlusSignatureProverConstantTime(credential.sigParams, revealedMsgs, false),
+            Statement.bbsPlusSignatureProverConstantTime((await this.getIssuerParams(credential.credential.schemaId))!, revealedMsgs, false),
         );
         const sAcc = proverStmts.add(
             Statement.vbAccumulatorMembership(
@@ -131,20 +151,20 @@ export class Holder {
         );
 
         const eq = new WitnessEqualityMetaStatement();
-        eq.addWitnessRef(sBBS, credential.k_handle);
+        eq.addWitnessRef(sBBS, credential.helper.k_handle);
         eq.addWitnessRef(sAcc, 0);
         const metaStatements = new MetaStatements();
         metaStatements.add(MetaStatement.witnessEquality(eq));
 
         const witnesses = new Witnesses();
-        witnesses.add(Witness.bbsPlusSignatureConstantTime(credential.signature, unrevealedMsgs, false));
-        witnesses.add(Witness.vbAccumulatorMembership(credential.messages[credential.k_handle]! ,credential.witness));
+        witnesses.add(Witness.bbsPlusSignatureConstantTime(credential.credential.signature, unrevealedMsgs, false));
+        witnesses.add(Witness.vbAccumulatorMembership(credential.credential.messages[credential.helper.k_handle]! ,credential.witness.publicWitness));
 
         const proofSpec = new ProofSpec(proverStmts, metaStatements);
         //const nonce = this.stringToBytes('nonce1');
         const proof = CompositeProof.generate(proofSpec, witnesses, this.nonce);
         console.log("Generated proof for cred1.");
-        await verifier.setProofInfo(credId, proof, revealedMsgs, credential.schemaId, credential.credDefId, credential.registryId, this.nonce, this.provingKey);
+        await verifier.setProofInfo(credId, proof, revealedMsgs, credential.credential.schemaId, credential.credential.credDefId, credential.credential.registryId, this.nonce, this.provingKey);
         return proof;
     }
 
@@ -174,7 +194,20 @@ export class Holder {
         return new AccumulatorPublicKey(bytes);
     }
 
-    async verifyWitness(credId: string, credential?: Credential): Promise<boolean> {
+    async getIssuerParams(schemaId: string): Promise<BBSPlusSignatureParamsG1 | null> {
+        const sigParams = BBSPlusSignatureParamsG1.generate(
+            (await this.getSchemaAttributes(schemaId)).length + 1, // +1 for the trailing revocationId (K_HANDLE)
+            this.stringToBytes(schemaId), //az aláírás paramétere a schemaID
+        );
+        return sigParams;
+    }
+
+    async getSchemaAttributes(schemaId: string): Promise<string[]> {
+        const schema = await this.schemaRegistryContract.getSchema!(schemaId);
+        return schema.attributeNames;
+    }
+
+    async verifyWitness(credId: string, credential?: CredentialRecord): Promise<boolean> {
         if (!credential){
             credential = this.credentialMap.get(credId);
         }
@@ -183,7 +216,7 @@ export class Holder {
             return false;
         }
         const y = credential.y;
-        const witness = credential.witness;
+        const witness = credential.witness.publicWitness;
         const accumulator = await this.getOnChainAccumulator();
         const publicKey = await this.getPublicKey();
         const params = await this.getParams();
@@ -200,11 +233,11 @@ export class Holder {
             console.error(`Credential with ID ${credId} not found.`);
             return null;
         }
-        return credential.witness;
+        return credential.witness.publicWitness;
     }
 
     async getEpoch(credId: string) {
-        const epoch = await this.revocationRegistryContract.getRegistry!(this.credentialMap.get(credId)!.registryId);
+        const epoch = await this.revocationRegistryContract.getRegistry!(this.credentialMap.get(credId)!.credential.registryId);
         return epoch;
     }
 
@@ -216,17 +249,17 @@ export class Holder {
                 console.error(`Credential with ID ${credId} not found.`);
                 return;
             }
-            if(credential.epoch === undefined || credential.epoch >= epoch){
+            if(credential.helper.epoch === undefined || credential.helper.epoch >= epoch){
                 console.log(`Credential with ID ${credId} is already up to date.`);
                 return;
             }
-            const fromBlock = credential.lastSyncedBlock + 1;
+            const fromBlock = credential.helper.lastSyncedBlock + 1;
             const filter = this.accumulatorContract.filters.AccumulatorUpdated!();
             const events = await this.accumulatorContract.queryFilter(filter, fromBlock, 'latest');
             if (events.length === 0) {
                 return;
             }
-            let witness1 = credential.witness;
+            let witness1 = credential.witness.publicWitness;
             const y = credential.y;
             const m = Accumulator.encodePositiveNumberAsAccumulatorMember(y);
             for (const event of events) {
@@ -258,11 +291,11 @@ export class Holder {
                     const removedM = Accumulator.encodePositiveNumberAsAccumulatorMember(Number(yRemoved));
                     witness.updatePostRemove(removedM, m, accBytes);
                 }*/
-                credential.epoch=Number(epoch);
-                credential.lastSyncedBlock = event.blockNumber;
+                credential.helper.epoch=Number(epoch);
+                credential.helper.lastSyncedBlock = event.blockNumber;
             }
-            credential.witness = witness1;
-            credential.private_witness = Witness.vbAccumulatorMembership(m, witness1);
+            credential.witness.publicWitness = witness1;
+            credential.witness.privateWitness = Witness.vbAccumulatorMembership(m, witness1);
         }
         catch(CannotBeZero)
         {
@@ -286,8 +319,6 @@ export class Holder {
         y: number,
         signature: BBSPlusSignatureG1,
         messages: Uint8Array[],
-        issuerPk: BBSPlusPublicKeyG2,
-        sigParams: BBSPlusSignatureParamsG1,
         k_handle: number,
         message_count: number,
         witness: VBMembershipWitness,
@@ -295,24 +326,35 @@ export class Holder {
         lastSyncedBlock: number) {
 
         const credential: Credential = {
+            credId,
             schemaId,
             credDefId,
             registryId,
-            y,
             signature,
             messages,
-            issuerPk,
-            sigParams,
-            k_handle,
-            message_count,
-            witness,
-            private_witness: w,
+        };
+
+        const helper: CredentialHelper = {
+            k_handle: k_handle,
+            message_count: message_count,
             epoch: 0,
             lastSyncedBlock: lastSyncedBlock
         };
+
+        const mywitness: MyWitness = {
+            publicWitness: witness,
+            privateWitness: w
+        };
         //if(!(await this.verifyWitness(credId, credential))) return;
     
-        this.credentialMap.set(credId, credential);
+        const credRekord: CredentialRecord = {
+            credential: credential,
+            y: y,
+            witness: mywitness,
+            helper: helper
+        }
+
+        this.credentialMap.set(credId, credRekord);
         
     }
 

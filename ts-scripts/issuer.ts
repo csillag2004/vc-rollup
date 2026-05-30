@@ -39,8 +39,6 @@ import { WitnessUpdateInfo } from '@docknetwork/crypto-wasm-ts/lib/accumulator/w
 type SignCredentialResult = {
     sig1: BBSPlusSignatureG1;
     cred1Messages: Uint8Array[];
-    issuerPk: BBSPlusPublicKeyG2;
-    sigParams?: BBSPlusSignatureParamsG1;
     k_handler: number;
     message_count: number;  
 };
@@ -311,7 +309,7 @@ export class Issuer {
 
     async credDefId(schemaId: string) {
         //BBSPlus
-         const sigParams = BBSPlusSignatureParamsG1.generate(
+        const sigParams = BBSPlusSignatureParamsG1.generate(
             (await this.getSchemaAttributes(schemaId)).length + 1, // +1 for the trailing revocationId (K_HANDLE)
             this.stringToBytes(schemaId), //az aláírás paramétere a schemaID
         );
@@ -498,9 +496,9 @@ export class Issuer {
         }
 
         const k_handler = cred1Messages.length - 1; //revocationId index, ami a K_HANDLE lesz a proofban
-        this.signResults.set(credId, { sig1, cred1Messages, issuerPk, sigParams: sigParams!, k_handler, message_count });
+        this.signResults.set(credId, { sig1, cred1Messages, k_handler, message_count });
 
-        this.credentialHolders.get(credId)?.setCredential(credId, schemaId!, credDefId!, registryId!, y!, sig1, cred1Messages, issuerPk, sigParams!, k_handler, message_count, witness1.witness, witness1.w1, this.starterBlock.get(credId)!);
+        this.credentialHolders.get(credId)?.setCredential(credId, schemaId!, credDefId!, registryId!, y!, sig1, cred1Messages, k_handler, message_count, witness1.witness, witness1.w1, this.starterBlock.get(credId)!);
         console.log("\nw1: ", witness1.w1, "\n");
         //return { sig1, cred1Messages, issuerPk, sigParams, k_handler, message_count};
     }
@@ -512,8 +510,6 @@ export class Issuer {
         }
 
         const signature = signResult.sig1;
-        const issuerPk = signResult.issuerPk;
-        const sigParams = signResult.sigParams;
 
         const y = await this.findYByCredId(credId);
         const m1 = Accumulator.encodePositiveNumberAsAccumulatorMember(y!);
@@ -524,7 +520,7 @@ export class Issuer {
         ];
 
         try{
-            const isValid = signature.verify(credMessages, issuerPk, sigParams!, false).verified;
+            const isValid = signature.verify(credMessages, this.issuer_kp.publicKey, this.signParams, false).verified;
             return isValid;
         }
         catch(e){
