@@ -44,7 +44,7 @@ type SignCredentialResult = {
 };
 
 export class Issuer {
-    private readonly ADDRESS=process.env.ADDRESS_ISSUER!;
+    private readonly ADDRESS: string;//=process.env.ADDRESS_ISSUER!;
     private readonly RPC_URL = 'https://sepolia-rpc.scroll.io';
     private readonly CHAIN_ID = 534351;
     private readonly REGISTRY = process.env.REGISTRY_ADDRESS!;
@@ -115,11 +115,13 @@ export class Issuer {
 
         const provider = new ethers.JsonRpcProvider(this.RPC_URL);
         const wallet = new ethers.Wallet(this.PRIVATE_KEY, provider);
+        this.ADDRESS = wallet.address;
         this.schemaRegistryContract = new ethers.Contract(this.SCHEMA_REGISTRY, artifact_schema.abi, wallet);
         this.credDefRegistryContract = new ethers.Contract(this.CREDDEF_REGISTRY, artifact_creddef.abi, wallet);
         this.revocationRegistryContract = new ethers.Contract(this.REVOCATION_REGISTRY, artifact_revocation.abi, wallet);
         this.accumulatorContract = new ethers.Contract(this.ACCUMULATOR_ADDR, artifact_accumulator.abi, wallet);  //le kell nullázni az akkumlátort!!!
         this.didContract = new ethers.Contract(this.REGISTRY, didRegistryAbi, wallet);
+        
 
         //this.myMap.set('cred1', 1001);
         //this.myMap.set('cred2', 2002);
