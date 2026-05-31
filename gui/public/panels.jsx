@@ -104,9 +104,17 @@ function CommandRow({ cmd, state, onRun, expanded, onExpand, isSuggested, runnin
   const isRunningMe        = runningId === cmd.id;
   const someoneElseRunning = !!runningId && runningId !== cmd.id;
 
+  // Effective value for a field: what the user typed, else its computed
+  // default (e.g. the auto-incrementing credId).
+  const effVal = (f) => (values[f.key] !== undefined ? values[f.key] : f.default);
+
   const submit = async () => {
     if (isRunningMe || someoneElseRunning) return;
-    const r = await onRun(cmd, values);
+    // Send defaults for any field the user left untouched, so an
+    // auto-populated value (like credId) is submitted as shown.
+    const payload = {};
+    for (const f of fields) payload[f.key] = effVal(f);
+    const r = await onRun(cmd, payload);
     if (r && r.error) {
       setError(r.error);
     } else {
@@ -133,7 +141,6 @@ function CommandRow({ cmd, state, onRun, expanded, onExpand, isSuggested, runnin
 
       {expanded && (
         <div className="cmd-body">
-          {cmd.blurb && <p className="cmd-blurb">{cmd.blurb}</p>}
           {fields.length === 0 ? (
             <p className="muted serif" style={{fontStyle: 'italic', fontSize: 12, margin: '4px 0 8px'}}>
               No inputs — this function takes none.
@@ -141,7 +148,7 @@ function CommandRow({ cmd, state, onRun, expanded, onExpand, isSuggested, runnin
           ) : (
             <div className="cmd-form">
               {fields.map((f) => (
-                <Field key={f.key} field={f} value={values[f.key]} onChange={setVal} />
+                <Field key={f.key} field={f} value={effVal(f)} onChange={setVal} />
               ))}
             </div>
           )}
@@ -227,11 +234,10 @@ function Sidebar({ state }) {
           {creds.map((c) => (
             <div className="cred-row" key={c.credId}>
               <div className="cred-head">
-                <span className="cred-name">{c.holderName}</span>
+                <span className="cred-name">{c.name || c.credId}</span>
                 <span className={`status ${c.status}`}>{c.status}</span>
               </div>
               <div className="cred-sub">
-                <span className="chip">{c.credId}</span>
                 <span>y={c.y}</span>
                 <span style={{marginLeft: 'auto'}}>
                   {c.signed     ? <span className="chip">σ</span>     : null}
@@ -267,8 +273,6 @@ function ActorPanel({ role, no, addr, blurb, commands, state, expanded, setExpan
         <span className="role-no">Actor {no}<br/>{addr.slice(0, 10)}…</span>
       </header>
       <div className="panel-body">
-        {blurb && <p className="role-blurb">{blurb}</p>}
-
         {summary}
 
         {Object.entries(groups).map(([gname, cmds]) => (
@@ -318,14 +322,11 @@ function HolderWallet({ state }) {
             const cred = state.credentials[c.credId];
             const revoked = cred && cred.status === 'revoked';
             return (
-              <div className="result-block" key={c.credId} style={{margin: 0}}>
+              <div className="result-block incoming" key={c.credId} style={{margin: 0}}>
                 <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'baseline'}}>
-                  <span><span className="kk">{c.credId}</span><span style={{fontFamily: 'var(--f-serif)', fontSize: 13}}>{c.holderName}</span></span>
-                  <span className={`status ${revoked ? 'revoked' : (c.witnessSynced ? 'active' : 'pending')}`}>
-                    {revoked ? 'revoked' : (c.witnessSynced ? 'witness synced' : 'witness stale')}
-                  </span>
+                  <span><span className="kk">{c.name || c.credId}</span></span>
+                  {revoked && <span className="status revoked">revoked</span>}
                 </div>
-                <div><span className="kk">σ</span>{truncMid(c.signature, 12, 6)}</div>
                 <div><span className="kk">schema</span>{state.schemas[c.schemaId]?.name || '?'}</div>
               </div>
             );
@@ -355,9 +356,8 @@ function VerifierInbox({ state }) {
             {proofs.map((p, i) => {
               const sch = state.schemas[p.schemaId];
               return (
-                <div className="result-block" key={i} style={{margin: 0}}>
-                  <div><span className="kk">{p.credId}</span><span style={{fontFamily: 'var(--f-serif)', fontSize: 13}}>{p.holderName}</span></div>
-                  <div><span className="kk">π</span>{truncMid(p.proofBytes, 12, 6)}</div>
+                <div className="result-block incoming" key={i} style={{margin: 0}}>
+                  <div><span className="kk">{p.name || p.credId}</span></div>
                   <div><span className="kk">reveals</span>
                     {p.revealed.length === 0
                       ? <span className="muted">none</span>
@@ -376,8 +376,7 @@ function VerifierInbox({ state }) {
           <div style={{fontFamily: 'var(--f-serif)', fontSize: 14, fontStyle: 'italic', marginBottom: 4}}>
             {last.isValid ? '✓ Verification successful' : '✗ Verification failed'}
           </div>
-          <div><span className="kk">credential</span>{last.credId}</div>
-          <div><span className="kk">holder</span>{last.holderName}</div>
+          <div><span className="kk">credential</span>{last.name || last.credId}</div>
           {state.schemas[last.schemaId]?.attributes.map((a, i) => {
             const isRevealed = last.revealed.includes(i);
             const v = isRevealed ? last.revealedMap[a] : null;

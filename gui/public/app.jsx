@@ -190,9 +190,6 @@ function App() {
     <div className={appClass}>
       <header className="masthead">
         <div className="title">Credential <em>Console</em></div>
-        <div className={`conn-pill ${conn.status}`}>
-          {conn.status === 'ok' ? 'online' : conn.status === 'connecting' ? 'connecting' : 'offline'}
-        </div>
       </header>
 
       {conn.status === 'err' && (

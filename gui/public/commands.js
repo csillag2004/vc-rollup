@@ -10,14 +10,15 @@ const parseAttributes = (raw) =>
     .map((s) => s.trim())
     .filter(Boolean);
 
-const newCredId = (state) => {
+// The real credId is now an opaque UUIDv7 minted server-side. The GUI labels
+// credentials with a friendly `name` (cred1, cred2, …); this picks the next
+// free one by scanning the names already in use.
+const newCredName = (state) => {
+  const taken = new Set();
+  for (const c of Object.values(state.credentials || {})) if (c.name) taken.add(c.name);
+  for (const c of Object.values(state.holderInbox || {})) if (c.name) taken.add(c.name);
   let i = 1;
-  while (
-    (state.credentials && state.credentials[`cred${i}`]) ||
-    (state.holderInbox && state.holderInbox[`cred${i}`])
-  ) {
-    i++;
-  }
+  while (taken.has(`cred${i}`)) i++;
   return `cred${i}`;
 };
 
@@ -148,8 +149,7 @@ const COMMANDS = [
           label: `${(s.schemas[r.schemaId] && s.schemas[r.schemaId].name) || ''} · ${r.id.slice(0,10)}…`,
         })),
         placeholder: 'pick a registry' },
-      { key: 'credId',     label: 'Credential ID', kind: 'text', placeholder: `e.g. ${newCredId(s)}`, width: 'sm' },
-      { key: 'holderName', label: 'Holder name',   kind: 'text', placeholder: 'e.g. Alice Tarr' },
+      { key: 'name',       label: 'Credential name', kind: 'text', placeholder: `e.g. ${newCredName(s)}`, default: newCredName(s), width: 'sm' },
     ],
     dynamicAttrFields: (s, values) => {
       const reg = s.registries[values.registryId];
@@ -177,7 +177,7 @@ const COMMANDS = [
       { key: 'credId', label: 'Credential', kind: 'select',
         options: Object.values(s.credentials).filter((c) => c.status === 'active').map((c) => ({
           value: c.credId,
-          label: `${c.credId} · ${c.holderName || ''}`,
+          label: `${c.name || c.credId}`,
         })),
         placeholder: 'pick a credential' },
     ],
@@ -195,7 +195,7 @@ const COMMANDS = [
       { key: 'credId', label: 'Credential', kind: 'select',
         options: Object.values(s.credentials).filter((c) => c.status === 'active').map((c) => ({
           value: c.credId,
-          label: `${c.credId} · ${c.holderName || ''}`,
+          label: `${c.name || c.credId}`,
         })),
         placeholder: 'pick a credential' },
     ],
@@ -212,7 +212,7 @@ const COMMANDS = [
       { key: 'credId', label: 'Credential', kind: 'select',
         options: Object.values(s.credentials).filter((c) => c.witnessed).map((c) => ({
           value: c.credId,
-          label: `${c.credId} · ${c.holderName || ''}`,
+          label: `${c.name || c.credId}`,
         })),
         placeholder: 'pick a credential' },
     ],
@@ -230,7 +230,7 @@ const COMMANDS = [
       { key: 'credId', label: 'Credential', kind: 'select',
         options: Object.values(s.holderInbox).map((c) => ({
           value: c.credId,
-          label: `${c.credId} · ${c.holderName || ''} (${c.witnessSynced ? 'synced' : 'stale'})`,
+          label: `${c.name || c.credId}`,
         })),
         placeholder: 'pick a credential' },
     ],
@@ -247,7 +247,7 @@ const COMMANDS = [
       { key: 'credId', label: 'Credential', kind: 'select',
         options: Object.values(s.holderInbox).map((c) => ({
           value: c.credId,
-          label: `${c.credId} · ${c.holderName || ''}`,
+          label: `${c.name || c.credId}`,
         })),
         placeholder: 'pick a credential' },
     ],
@@ -277,7 +277,7 @@ const COMMANDS = [
       { key: 'credId', label: 'Pending proof', kind: 'select',
         options: s.verifierInbox.proofs.map((p) => ({
           value: p.credId,
-          label: `${p.credId} · ${p.holderName || ''}`,
+          label: `${p.name || p.credId}`,
         })),
         placeholder: 'pick a proof' },
     ],
@@ -292,6 +292,6 @@ window.DEMO = {
   ACTOR_ADDR,
   SCROLL_BLOCK_BASE,
   parseAttributes,
-  newCredId,
+  newCredName,
   fetchState,
 };

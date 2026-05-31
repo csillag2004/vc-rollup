@@ -14,6 +14,7 @@ import 'dotenv/config';
 import * as http from 'http';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as crypto from 'crypto';
 import { ethers } from 'ethers';
 import { initializeWasm } from '@docknetwork/crypto-wasm-ts';
 
@@ -84,22 +85,48 @@ function hookTxCapture() {
 // GUI-only metadata. The logic layer does not track these.
 type Meta = {
   attrValues: Map<string, string[]>;          // credId → attribute values typed at issuance
-  holderName: Map<string, string>;             // credId → display name
+  name:       Map<string, string>;             // credId → GUI-only friendly label (cred1, cred2, …)
   revoked:    Set<string>;
   witnessed:  Set<string>;
   signed:     Set<string>;
   proofMeta:  Map<string, { revealed: number[]; revealedMap: Record<string, string>; proofBytes: string }>;
-  lastVerified: { credId: string; holderName: string; schemaId: string; revealed: number[]; revealedMap: Record<string,string>; isValid: boolean } | null;
+  lastVerified: { credId: string; name: string; schemaId: string; revealed: number[]; revealedMap: Record<string,string>; isValid: boolean } | null;
 };
 const meta: Meta = {
   attrValues: new Map(),
-  holderName: new Map(),
+  name:       new Map(),
   revoked:    new Set(),
   witnessed:  new Set(),
   signed:     new Set(),
   proofMeta:  new Map(),
   lastVerified: null,
 };
+
+// UUIDv7 — 48-bit Unix-ms timestamp + 74 random bits, version/variant tagged.
+// Used as the real, opaque credId handed to the logic layer; the GUI shows the
+// friendly `name` (cred1, cred2, …) instead so the long id never confuses.
+function uuidv7(): string {
+  const ts = Date.now();
+  const b = crypto.randomBytes(16);
+  b[0] = (ts / 2 ** 40) & 0xff;
+  b[1] = (ts / 2 ** 32) & 0xff;
+  b[2] = (ts / 2 ** 24) & 0xff;
+  b[3] = (ts / 2 ** 16) & 0xff;
+  b[4] = (ts / 2 ** 8) & 0xff;
+  b[5] = ts & 0xff;
+  b[6] = (b[6]! & 0x0f) | 0x70;   // version 7
+  b[8] = (b[8]! & 0x3f) | 0x80;   // variant 10xx
+  const h = b.toString('hex');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+
+// A previous demo run leaves a live accumulator on Scroll Sepolia, but the
+// rest of the world state (schemas, credDefs, …) lives only in-memory and is
+// empty on a fresh start. If we surfaced that stale on-chain accumulator the
+// "next" suggestion would skip past "Initialise Accumulator" to "Register
+// Schema". So we treat the accumulator as live only once it's been
+// (re)initialised in this session; the reset endpoint clears the flag.
+let accumulatorReady = false;
 
 // Address of the wallet powering each actor — derived from the env-supplied
 // private keys so the GUI can show them in the panel headers.
@@ -197,7 +224,7 @@ async function buildState() {
             registryId: rid,
             credDefId:  cid,
             schemaId:   sid,
-            holderName: meta.holderName.get(credId) || '',
+            name:       meta.name.get(credId) || credId,
             attributeValues: meta.attrValues.get(credId) || [],
             y,
             status:    meta.revoked.has(credId) ? 'revoked' : 'active',
@@ -227,7 +254,7 @@ async function buildState() {
       // presence as a flag.
       holderInbox[credId] = {
         credId,
-        holderName: meta.holderName.get(credId) || '',
+        name:       meta.name.get(credId) || credId,
         schemaId:   cred?.schemaId,
         attributeValues: meta.attrValues.get(credId) || [],
         signature:  sigHex || '0x',
@@ -249,7 +276,7 @@ async function buildState() {
       const m = meta.proofMeta.get(credId) || { revealed: [], revealedMap: {}, proofBytes: '0x' };
       proofs.push({
         credId,
-        holderName: meta.holderName.get(credId) || '',
+        name:       meta.name.get(credId) || credId,
         schemaId:   p?.schemaId,
         revealed:   m.revealed,
         revealedMap: m.revealedMap,
@@ -262,7 +289,7 @@ async function buildState() {
   try { block = await provider.getBlockNumber(); } catch (_) {}
 
   return {
-    accumulator: accValueHex ? { value: accValueHex, pubKey: accPkHex || '0x', epoch: 0 } : null,
+    accumulator: (accumulatorReady && accValueHex) ? { value: accValueHex, pubKey: accPkHex || '0x', epoch: 0 } : null,
     schemas, credDefs, registries, credentials,
     witnesses: {},                  // not surfaced separately — sidebar shows it via cred.witnessed
     holderInbox,
@@ -282,6 +309,7 @@ const handlers: Record<string, (v: any) => Promise<RunResult>> = {
 
   async initAccumulator() {
     await issuer.createAccumulator();
+    accumulatorReady = true;
     // Three on-chain txs are emitted, in this order:
     // 1) Accumulator.setAccumulator(),  2) Accumulator.setParams(),  3) Accumulator.setPublicKey().
     return { log: [
@@ -330,8 +358,6 @@ const handlers: Record<string, (v: any) => Promise<RunResult>> = {
 
   async issueCredential(v) {
     if (!v.registryId) throw new Error('registry is required');
-    if (!v.credId)     throw new Error('credId is required');
-    if (!v.holderName) throw new Error('holder name is required');
     // Look up the schema attached to the chosen registry so we know which
     // attribute fields the form was supposed to collect.
     const credDefId = issuer.findCredDefIdByRegistry(v.registryId);
@@ -344,16 +370,21 @@ const handlers: Record<string, (v: any) => Promise<RunResult>> = {
     const attrValues = attrs.map((_, i) => String(v[`attr:${i}`] || '').trim());
     if (attrValues.some((x) => !x)) throw new Error('fill every attribute value');
 
-    await issuer.addCredentials(v.credId, v.registryId, holder);
+    // The real credId is an opaque UUIDv7; the form-supplied `name` (cred1, …)
+    // is GUI-only and never reaches the logic layer.
+    const credId = uuidv7();
+    const name = String(v.name || '').trim() || credId;
 
-    meta.attrValues.set(v.credId, attrValues);
-    meta.holderName.set(v.credId, v.holderName);
+    await issuer.addCredentials(credId, v.registryId, holder);
+
+    meta.attrValues.set(credId, attrValues);
+    meta.name.set(credId, name);
 
     return { log: [
-      { kind: 'info', actor: 'issuer', msg: `assign y(${v.credId}) — random scalar member` },
+      { kind: 'info', actor: 'issuer', msg: `assign y(${name}) — random scalar member` },
       { kind: 'tx',   actor: 'issuer', msg: 'RevocationRegistry.updateRegistry(adds=[y])' },
       { kind: 'tx',   actor: 'issuer', msg: 'Accumulator.setAccumulator(post-add)' },
-      { kind: 'ok',   actor: 'issuer', msg: `credential ${v.credId} (${v.holderName}) issued` },
+      { kind: 'ok',   actor: 'issuer', msg: `credential ${name} issued · id ${credId}` },
     ]};
   },
 
@@ -363,12 +394,12 @@ const handlers: Record<string, (v: any) => Promise<RunResult>> = {
     if (!registryId) throw new Error(`registry for ${v.credId} not found`);
     await issuer.revokeCredentials(v.credId, registryId);
     meta.revoked.add(v.credId);
-    const hn = meta.holderName.get(v.credId) || '';
+    const nm = meta.name.get(v.credId) || v.credId;
     return { log: [
-      { kind: 'warn', actor: 'issuer', msg: `remove y(${v.credId}) from accumulator state` },
+      { kind: 'warn', actor: 'issuer', msg: `remove y(${nm}) from accumulator state` },
       { kind: 'tx',   actor: 'issuer', msg: 'Accumulator.setAccumulator(post-remove)' },
       { kind: 'tx',   actor: 'issuer', msg: 'RevocationRegistry.updateRegistry(removes=[y])' },
-      { kind: 'ok',   actor: 'issuer', msg: `${v.credId}${hn ? ' (' + hn + ')' : ''} revoked` },
+      { kind: 'ok',   actor: 'issuer', msg: `${nm} revoked` },
     ]};
   },
 
@@ -416,9 +447,11 @@ const handlers: Record<string, (v: any) => Promise<RunResult>> = {
     const reveals = (v.reveal || []).map((x: string) => Number(x));
     const proof = await holder.compositeProofForCredential(v.credId, reveals, verifier);
     if (!proof) throw new Error('proof generation returned null');
-    // Snapshot the reveal map for the sidebar/inbox views
-    const cred = (holder as any).credentialMap.get(v.credId);
-    const schemaId = cred?.schemaId;
+    // Snapshot the reveal map for the sidebar/inbox views.
+    // credentialMap now holds a nested CredentialRecord (holder.ts:57), so the
+    // schemaId lives under `.credential`.
+    const rec = (holder as any).credentialMap.get(v.credId);
+    const schemaId = rec?.credential?.schemaId ?? rec?.schemaId;
     let attrs: string[] = [];
     try {
       const ix = issuer as any;
@@ -452,7 +485,7 @@ const handlers: Record<string, (v: any) => Promise<RunResult>> = {
     const schemaId = (verifier as any).proofinfo?.get(v.credId)?.presentation?.schemaId || '';
     meta.lastVerified = {
       credId: v.credId,
-      holderName: meta.holderName.get(v.credId) || '',
+      name: meta.name.get(v.credId) || v.credId,
       schemaId,
       revealed: m?.revealed || [],
       revealedMap: m?.revealedMap || {},
@@ -539,12 +572,13 @@ const server = http.createServer(async (req, res) => {
       verifier = new Verifier();
       hookTxCapture();
       meta.attrValues.clear();
-      meta.holderName.clear();
+      meta.name.clear();
       meta.revoked.clear();
       meta.witnessed.clear();
       meta.signed.clear();
       meta.proofMeta.clear();
       meta.lastVerified = null;
+      accumulatorReady = false;
       const state = await buildState();
       return sendJson(res, 200, { state, log: [{ kind: 'info', actor: 'system', msg: 'GUI bridge reset — actors re-instantiated' }] });
     }

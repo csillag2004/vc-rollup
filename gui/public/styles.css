@@ -555,6 +555,14 @@ body {
   border-color: var(--accent);
   color: var(--accent);
 }
+/* Received items — a credential landing in the holder's wallet, a
+   presentation landing in the verifier's inbox — get a little extra lift. */
+.result-block.incoming {
+  background: var(--paper-card);
+  border-color: var(--accent-soft);
+  border-left: 3px solid var(--accent);
+  box-shadow: var(--card-shadow);
+}
 .result-block .kk {
   color: var(--ink-faint);
   margin-right: 6px;
