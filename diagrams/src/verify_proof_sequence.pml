@@ -3,7 +3,7 @@ skinparam backgroundColor #fbf9f4
 title Verify Composite Proof (Verifier) — communication with contracts
 
 actor "Verifier\n(off-chain)" as Verifier
-participant "SchemaRegistry\ncontract\n(Scroll Sepolia)" as Schema
+
 participant "CredDefRegistry\ncontract\n(Scroll Sepolia)" as CredDef
 participant "EthereumDIDRegistry\ncontract\n(Scroll Sepolia)" as DID
 participant "Accumulator\ncontract\n(Scroll Sepolia)" as Acc
@@ -38,6 +38,13 @@ Acc --> Verifier : value
 deactivate Acc
 
 note over Verifier : verify composite proof (off-chain)
+
+alt proof valid
+  Verifier -> Verifier : return true              
+else proof invalid
+  Verifier -> Verifier : return false
+  Verifier -[#fbf9f4]-> Acc
+end
 
 
 @enduml
