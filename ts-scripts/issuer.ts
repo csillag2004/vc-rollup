@@ -32,6 +32,7 @@ import { on } from 'events';
 import { findPackageJSON } from 'module';
 import { stat } from 'fs/promises';
 import { WitnessUpdateInfo } from '@docknetwork/crypto-wasm-ts/lib/accumulator/witness-update-info';
+import { uuidv7 } from 'uuidv7';
 
 
 
@@ -334,7 +335,7 @@ export class Issuer {
 
         //CredDef
         const keyId = ethers.keccak256(this.bytesToHex(issuerPk.bytes));
-        const credDefTx = await this.credDefRegistryContract.registerCredDef!(schemaId, "default", keyId);
+        const credDefTx = await this.credDefRegistryContract.registerCredDef!(schemaId, "default", keyId); //TAG NEM LEHET DEFAULT!!!
         const credDefReceipt = await credDefTx.wait();
         const credDefEvent = this.credDefRegistryContract.interface.parseLog(credDefReceipt?.logs[0]!);
         const creddefId = credDefEvent?.args[0]; // credDefId az első argument
@@ -361,11 +362,11 @@ export class Issuer {
 
     async addCredentials(credId: string, registryId: string, holder: Holder) {
         // reuse existing y if this credId was already issued, otherwise generate a new one
-        const y = (await this.findYByCredId(credId)) ?? (Math.floor(Math.random() * (Number.MAX_SAFE_INTEGER - 1)) + 1);
+        const y = (await this.findYByCredId(credId)) ?? (Math.floor(Math.random() * (Number.MAX_SAFE_INTEGER - 1)) + 1); //EZ MIÉRT NEM UUIDv7?
         const credDefId = this.findCredDefIdByRegistry(registryId)!;
         const schemaId = this.findSchemaIdByCredDef(credDefId)!;
         this.addCredToTree(schemaId, credDefId, registryId, credId, y);
-        this.credentialHolders.set(credId, holder); //EZ ÍGY JÓ???
+        this.credentialHolders.set(credId, holder);
 
         const m = Accumulator.encodePositiveNumberAsAccumulatorMember(y);
         const accumulator = await this.getOnChainAccumulator();

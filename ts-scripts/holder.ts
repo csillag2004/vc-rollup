@@ -163,7 +163,7 @@ export class Holder {
         const proofSpec = new ProofSpec(proverStmts, metaStatements);
         //const nonce = this.stringToBytes('nonce1');
         const proof = CompositeProof.generate(proofSpec, witnesses, this.nonce);
-        console.log("Generated proof for cred1.");
+        console.log("Generated proof for cred1."); //randomnak kéne lennie
         await verifier.setProofInfo(credId, proof, revealedMsgs, credential.credential.schemaId, credential.credential.credDefId, credential.credential.registryId, this.nonce, this.provingKey);
         return proof;
     }
