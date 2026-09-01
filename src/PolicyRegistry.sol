@@ -1,16 +1,27 @@
+/*import {console} from "forge-std/console.sol";
+ 
+
 contract PolicyRegistry {
     enum Operation { Issuance, Presentation, Revocation }
-    enum Validation { Valid, Revoked }
-    enum DAGType { AND, OR }
+    enum Validation { Valid, Revoked, Invalid }
+    enum DAGType { AND, OR, XOR } //inverzót még átgondolom, több kapu
+
+    //predikátumhalmazokat akarjunk tárolni
+    //predikátumot akarjunk visszaadni
+    //találjuk ki a solidity-> Rust predikátum interfészt
+    //Rust könyvtár létezik-e string->bool hálózat ÉS solidityben van-e létező contract rá
+    //DAG (revoke, invalid) hogy néz ki, schema id
+    //CSP
 
     struct Leaf{
-        bytes32 schemaId;
+        bytes32 schemaId;  //hosszútávon nem a legjobb megoldás
         Validation validation;
         address[] issuers;
     }
 
-    struct Gate{
+    struct Gate{  //ne csak két bemenete legyen (a kiértékelő tudja-e kezelni a többet)
         DAGType dagType;
+        //uint16[] inputs;  
         uint16 right;
         uint16 left;
     }
@@ -33,6 +44,9 @@ contract PolicyRegistry {
 
     //schemaId => Operation => DAG (nem kell policyId, mert a policyId a schemaId + operation)
     mapping(bytes32 => mapping(Operation => DAG)) private _policies;
+
+
+
 
     event PolicySet(bytes32 indexed schemaId, Operation indexed operation, uint16 root, uint256 createdAt);
     event PolicyDeactivated(bytes32 indexed schemaId, Operation indexed operation, uint256 deactivatedAt);
@@ -120,4 +134,4 @@ contract PolicyRegistry {
         if(_policies[schemaId][operation].createdAt == 0) revert("Policy does not exist.");
         return _policies[schemaId][operation];
     }
-}
+}*/
