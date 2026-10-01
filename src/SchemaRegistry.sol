@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 contract SchemaRegistry{
 
     struct Schema {
-        address issuer;
+        address author;
         string name;
         string version;
         string[] attributeNames;
@@ -12,7 +12,7 @@ contract SchemaRegistry{
 
     mapping(bytes32 => Schema) private schemas;
 
-    event SchemaRegistered(bytes32 indexed schemaId, address indexed issuer, string name, string version);
+    event SchemaRegistered(bytes32 indexed schemaId, address indexed author, string name, string version);
 
 
     function registerSchema(
@@ -34,9 +34,11 @@ contract SchemaRegistry{
 
         //létrehozás
         Schema storage s = schemas[schemaId];
-        s.issuer = msg.sender;
+        s.author = msg.sender;
         s.name = name;
         s.version = version;
+        s.attributeNames.push("revocation_id");
+        s.attributeNames.push("link_secret");
         for (uint256 i = 0; i < attributeNames.length; i++) {
             s.attributeNames.push(attributeNames[i]);
         }
@@ -52,6 +54,10 @@ contract SchemaRegistry{
     function getSchema(bytes32 schemaId) external view returns (Schema memory){
         if(schemas[schemaId].createdAt==0) revert("This schema is not exist.");
         return schemas[schemaId];
+    }
+
+    function exists(bytes32 schemaId) external view returns (bool) {
+        return schemas[schemaId].createdAt != 0;
     }
 
 
