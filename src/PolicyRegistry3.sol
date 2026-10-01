@@ -44,7 +44,10 @@ contract PolicyRegistry {
         GateType[] gateTypes;
         ConstraintConstant[] constraints;
         ConstraintAttribute[] attributeConstraints;
+        //LINK SECRET
     }
+
+    cred[0] gate [0] cred[1] gate[1]
 
 
 
