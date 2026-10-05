@@ -20,16 +20,34 @@ contract StateRegistry {
     //bytes params -> könyvtár függő, hogy kellenek-e
     uint64 version;
     bytes32 srsHash;
-    uint33 srsLength;
-    uint64 createdAt;
+    uint32 srsLength;
+
+    /// Egy regisztrált kiadás. A commitment rejti y-t a revokálásig.
+    struct Issuance {
+        bytes32 credDefId;
+        uint64  includedAt;   // az a version, amelyik I-jébe az ADMIN beszámolta; 0 = még nincs benne
+    }
+
+        /// Egy issuer által kért, még végre nem hajtott revokálás.
+    struct RevocationRequest {
+        bytes32 credDefId;
+        bytes32 commitment;
+        bytes32 guardDigest;  // 0 = feltétel nélküli; egyébként csak őrzött revokálás, ezzel a digesttel
+    }
 
 
     struct Group {
-        uint64  version;    // csak akkor nő, ha a csoport egy tagját revokálják (SP-L-c-24)
-        uint32  size;
+        address creator; 
+        bytes32[] members;
         uint256 createdAt;
     }
 
     CredDefRegistry public immutable credDefRegistry;
     IEthereumDIDRegistry public immutable didRegistry; //kell DID?
+    address public immutable adminDid;
+
+    mapping(uint64 version => bytes32) private valuesHashes; //version -> hash(A,R,I)
+    mapping(bytes32 commitment => Issuance) private issuances;
+    mapping(bytes32 y => RevocationRequest) private requests;
+    
 }
