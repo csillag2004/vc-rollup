@@ -131,8 +131,84 @@ contract StateRegistry {
         _;
     }
 
+        modifier whenInitialized() {
+        if (srsHash == bytes32(0)) revert SrsNotPublished();
+        _;
+    }
+
+    function publishSrs(bytes[] calldata g1Powers, bytes[] calldata g2Powers) external onlyAdmin {
+        if (srsHash != bytes32(0)) revert SrsAlreadyPublished();
+        uint256 len = g2Powers.length;
+        if (len < 2 || g1Powers.length != len) revert BadSrsLength(g1Powers.length, len);
+
+        for (uint256 i = 0; i < len; i++) {
+            _checkG1(g1Powers[i]);
+            _checkG2(g2Powers[i]);
+        }
+        if (keccak256(g1Powers[0]) != G1_GENERATOR_HASH) revert SrsMismatch(0);
+        if (keccak256(g2Powers[0]) != G2_GENERATOR_HASH) revert SrsMismatch(0);
+        if (keccak256(g2Powers[1]) != keccak256(Qtilde)) revert SrsMismatch(1);
+        if (Q.length != 0 && keccak256(g1Powers[1]) != keccak256(Q)) revert SrsMismatch(1);
+
+        bytes32 h = keccak256(abi.encode(g1Powers, g2Powers));
+        srsHash = h;
+        srsDegree = uint32(len - 1);
+        emit SrsPublished(srsDegree, h, g1Powers, g2Powers);
+    }
+
+
+    ///KIADÁS
+
+    function registerIssuance(bytes32 credDefId, bytes32 commitment)
+        external whenInitialized onlyIssuerOf(credDefId)
+    {
+        if (commitment == bytes32(0)) revert EmptyCommitment();
+        Issuance storage iss = issuances[commitment];
+        _expect(commitment, iss, Status.None);
+        iss.credDefId = credDefId;
+        iss.status = Status.Registered;
+        emit IssuanceRegistered(credDefId, commitment);
+    }
+
+    /// Off-chain előfeltétel: az issuer kiadáskor privát csatornán elküldi az ADMIN-nak a (credDefId, y, salt) hármast,
+    /// az ADMIN ebből és α-ból kiszámolja az új I-t és W_IR-t, a holdernek pedig átadja a kezdeti receiptet: C = A^(1/(y+α)).
+    /// Ezt a függvényt az ADMIN hívja, miután a holder a commitmentet regisztrálta, és az issuer kiadta a credentialt.
+    function issueUpdate(bytes32[] calldata commitments, bytes calldata newI, bytes calldata newWIR)
+        external onlyAdmin
+    {
+        if (commitments.length == 0) revert NothingToInclude();
+        _checkG1(newI);
+        _checkG1(newWIR);
+
+        uint64 v = version + 1;
+        for (uint256 i = 0; i < commitments.length; i++) {
+            Issuance storage iss = issuances[commitments[i]];
+            _expect(commitments[i], iss, Status.Registered);
+            iss.status = Status.Included;
+            iss.includedAt = v;
+        }
+
+        I = newI;
+        WIR = newWIR;
+        version = v;
+        valuesHashes[v] = _valuesHash();
+        emit Issued(v, commitments, newI, newWIR);
+    }
+
 
     function _valuesHash() private view returns (bytes32) {
         return keccak256(abi.encode(A, Rtilde, I));
+    }
+
+    function _expect(bytes32 commitment, Issuance storage iss, Status expected) private view {
+        if (iss.status != expected) revert WrongStatus(commitment, expected, iss.status);
+    }
+
+    function _checkG1(bytes calldata p) private pure {
+        if (p.length != G1_LEN) revert BadG1Length(p.length);
+    }
+
+    function _checkG2(bytes calldata p) private pure {
+        if (p.length != G2_LEN) revert BadG2Length(p.length);
     }
 }
