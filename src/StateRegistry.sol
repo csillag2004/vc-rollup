@@ -150,8 +150,8 @@ contract StateRegistry {
             _checkG1(g1Powers[i]);
             _checkG2(g2Powers[i]);
         }
-        if (keccak256(g1Powers[0]) != G1_GENERATOR_HASH) revert SrsMismatch(0);
-        if (keccak256(g2Powers[0]) != G2_GENERATOR_HASH) revert SrsMismatch(0);
+        if (keccak256(g1Powers[0]) != keccak256(G1_GENERATOR)) revert SrsMismatch(0);
+        if (keccak256(g2Powers[0]) != keccak256(G2_GENERATOR)) revert SrsMismatch(0);
         if (keccak256(g2Powers[1]) != keccak256(Qtilde)) revert SrsMismatch(1);
         if (Q.length != 0 && keccak256(g1Powers[1]) != keccak256(Q)) revert SrsMismatch(1);
 
@@ -252,7 +252,9 @@ contract StateRegistry {
         bytes calldata newWIR
     ) external onlyAdmin {
         if (version != expectedVersion) revert StaleVersion(expectedVersion, version);   // compare
-        _applyRevoke(y, _checkRequested(y, salt), newA, newRtilde, newWIR);              // swap
+        bytes32 c = _checkRequested(y, salt);
+        if (issuances[c].guardGroup != bytes32(0)) revert WrongGuardScope(c, issuances[c].guardGroup);
+        _applyRevoke(y, c, newA, newRtilde, newWIR); 
     }
 
     function guardedRevokeNarrowed(
@@ -315,6 +317,50 @@ contract StateRegistry {
         returns (bytes memory, bytes memory, bytes memory, bytes memory, uint64)
     {
         return (A, Rtilde, I, WIR, version);
+    }
+
+    function getIssuer() external view returns (address) {
+        return issuer;
+    }
+
+    function getA() external view returns (bytes memory) {
+        return A;
+    }
+
+    function getRtilde() external view returns (bytes memory) {
+        return Rtilde;
+    }
+
+    function getI() external view returns (bytes memory) {
+        return I;
+    }
+
+    function getV0() external view returns (bytes memory) {
+        return V0;
+    }
+
+    function getQtilde() external view returns (bytes memory) {
+        return Qtilde;
+    }
+
+    function getQ() external view returns (bytes memory) {
+        return Q;
+    }
+
+    function getWIR() external view returns (bytes memory) {
+        return WIR;
+    }
+
+    function getVersion() external view returns (uint64) {
+        return version;
+    }
+
+    function getSrsHash() external view returns (bytes32) {
+        return srsHash;
+    }
+
+    function getSrsLength() external view returns (uint32) {
+        return srsLength;
     }
 
     // Történeti érték hitelesítése (1.4, Rule 1). keccak256(abi.encode(A, Rtilde, I)); jövőbeli versionre 0.
@@ -389,11 +435,11 @@ contract StateRegistry {
     }
 
     function _checkG1(bytes calldata p) private pure {
-        if (p.length != G1_LEN) revert BadG1Length(p.length);
+        if (p.length != G1_GENERATOR.length) revert BadG1Length(p.length);
     }
 
     function _checkG2(bytes calldata p) private pure {
-        if (p.length != G2_LEN) revert BadG2Length(p.length);
+        if (p.length != G2_GENERATOR.length) revert BadG2Length(p.length);
     }
 
     function _requireIssuer(bytes32 credDefId) private view {
@@ -439,17 +485,5 @@ contract StateRegistry {
     function _checkGroupFresh(bytes32 groupId, uint64 expectedGroupVersion) private view {
         uint64 gv = groupVersion(groupId);
         if (gv != expectedGroupVersion) revert StaleGroupVersion(groupId, expectedGroupVersion, gv);
-    }
-
-    function _checkGroupFresh(bytes32 groupId, uint64 expectedGroupVersion) private view {
-        uint64 gv = groupVersion(groupId);
-        if (gv != expectedGroupVersion) revert StaleGroupVersion(groupId, expectedGroupVersion, gv);
-    }
-
-    function _checkRequested(bytes32 y, bytes32 salt) private view returns (bytes32 c) {
-        if (y == bytes32(0)) revert EmptyRevocationId();
-        c = commitmentOf(y, salt);
-        _expect(c, issuances[c], Status.Requested);
-        if (revokedCommitment[y] != bytes32(0)) revert AlreadyRevoked(y);   // ugyanaz az y egy másik commitment alatt
     }
 }
