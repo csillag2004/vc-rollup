@@ -42,7 +42,7 @@ contract StateRegistryTest is Test {
 
     event RegistryCreated(bytes32 indexed registryId, bytes32 indexed credDefId, bytes32 label, bytes V0, bytes Qtilde, bytes Q);
     event SrsPublished(bytes32 indexed registryId, uint32 degree, bytes32 srsHash, bytes[] g1Powers, bytes[] g2Powers);
-    event Issued(bytes32 indexed registryId, uint64 indexed version, bytes newI, bytes newWIR);
+    event Issued(bytes32 indexed registryId, uint64 indexed version, bytes newI, bytes newWIR, bytes32 guardDigest);
     event Revoked(bytes32 indexed registryId, uint64 indexed version, bytes32 indexed y, bytes newA, bytes newRtilde, bytes newWIR, bytes32 guardDigest);
     event GroupCreated(bytes32 indexed groupId, bytes32 indexed registryId, address indexed creator, bytes32 label, bytes32[] members);
 
@@ -135,6 +135,11 @@ contract StateRegistryTest is Test {
     function _issue(bytes32 id, bytes32 tag) internal {
         vm.prank(alice);
         registry.issueUpdate(id, _g1(abi.encode("I", tag)), _g1(abi.encode("WIR-i", tag)));
+    }
+
+    function _guardedIssue(bytes32 id, uint64 expectedVersion, bytes32 tag) internal {
+        vm.prank(alice);
+        registry.guardedIssueUpdate(id, expectedVersion, _g1(abi.encode("I", tag)), _g1(abi.encode("WIR-i", tag)), DIGEST);
     }
 
     function _revoke(bytes32 id, bytes32 y) internal {
@@ -449,7 +454,7 @@ contract StateRegistryTest is Test {
         bytes memory newWIR = _g1("WIR1");
 
         vm.expectEmit(true, true, true, true, address(registry));
-        emit Issued(regId, 1, newI, newWIR);
+        emit Issued(regId, 1, newI, newWIR, bytes32(0));
         vm.prank(alice);
         registry.issueUpdate(regId, newI, newWIR);
 
@@ -492,6 +497,95 @@ contract StateRegistryTest is Test {
         vm.expectRevert(abi.encodeWithSelector(StateRegistry.BadG1Length.selector, uint256(0)));
         vm.prank(alice);
         registry.issueUpdate(regId, _g1("I"), "");
+
+        assertEq(_version(regId), 0);
+    }
+
+    // ---------------------------------------------------------------------
+    // Őrzött kiadás
+    // ---------------------------------------------------------------------
+
+    function test_guardedIssueUpdate() public {
+        _revoke(regId, Y1);
+        uint64 v = _version(regId);
+        (bytes memory aBefore, bytes memory rBefore,,,) = registry.getValues(regId);
+        bytes memory newI = _g1(abi.encode("I", bytes32("1")));
+        bytes memory newWIR = _g1(abi.encode("WIR-i", bytes32("1")));
+
+        vm.expectEmit(true, true, true, true, address(registry));
+        emit Issued(regId, v + 1, newI, newWIR, DIGEST);
+        _guardedIssue(regId, v, "1");
+
+        (bytes memory a, bytes memory r, bytes memory i, bytes memory w, uint64 vAfter) = registry.getValues(regId);
+        assertEq(vAfter, v + 1);
+        assertEq(i, newI);
+        assertEq(w, newWIR);
+        // a kiadás A-t és R̃-t nem érinti
+        assertEq(a, aBefore);
+        assertEq(r, rBefore);
+        assertEq(registry.valuesHashAt(regId, v + 1), keccak256(abi.encode(aBefore, rBefore, newI)));
+    }
+
+    function test_guardedIssueUpdateStaleVersionReverts() public {
+        _issue(regId, "1");
+        uint64 v = _version(regId);
+
+        vm.expectRevert(abi.encodeWithSelector(StateRegistry.StaleVersion.selector, v - 1, v));
+        _guardedIssue(regId, v - 1, "2");
+
+        vm.expectRevert(abi.encodeWithSelector(StateRegistry.StaleVersion.selector, v + 1, v));
+        _guardedIssue(regId, v + 1, "2");
+
+        assertEq(_version(regId), v);
+    }
+
+    // Két kiadás ugyanarra a versionre: a második már elavult állapotra hivatkozik.
+    function test_guardedIssueUpdateStaleAfterOtherIssuance() public {
+        uint64 v = _version(regId);
+        _guardedIssue(regId, v, "1");
+
+        vm.expectRevert(abi.encodeWithSelector(StateRegistry.StaleVersion.selector, v, v + 1));
+        _guardedIssue(regId, v, "2");
+
+        _guardedIssue(regId, v + 1, "2");
+        assertEq(_version(regId), v + 2);
+    }
+
+    // A revokálás is lépteti a versiont, így az őrzött kiadást is érvényteleníti.
+    function test_guardedIssueUpdateStaleAfterRevocation() public {
+        uint64 v = _version(regId);
+        _revoke(regId, Y1);
+
+        vm.expectRevert(abi.encodeWithSelector(StateRegistry.StaleVersion.selector, v, v + 1));
+        _guardedIssue(regId, v, "1");
+    }
+
+    function test_guardedIssueUpdateOnlyIssuer() public {
+        vm.expectRevert(abi.encodeWithSelector(StateRegistry.NotIssuer.selector, credDefId, bob));
+        vm.prank(bob);
+        registry.guardedIssueUpdate(regId, 0, _g1("I"), _g1("WIR"), DIGEST);
+    }
+
+    function test_guardedIssueUpdateUnknownRegistryReverts() public {
+        bytes32 id = keccak256("no-such-registry");
+        vm.expectRevert(abi.encodeWithSelector(StateRegistry.UnknownRegistry.selector, id));
+        _guardedIssue(id, 0, "1");
+    }
+
+    function test_guardedIssueUpdateBeforeSrsReverts() public {
+        bytes32 id = _freshRegistry();
+        vm.expectRevert(StateRegistry.SrsNotPublished.selector);
+        _guardedIssue(id, 0, "1");
+    }
+
+    function test_guardedIssueUpdateBadPointLengthReverts() public {
+        vm.expectRevert(abi.encodeWithSelector(StateRegistry.BadG1Length.selector, uint256(96)));
+        vm.prank(alice);
+        registry.guardedIssueUpdate(regId, 0, _g2("I"), _g1("WIR"), DIGEST);
+
+        vm.expectRevert(abi.encodeWithSelector(StateRegistry.BadG1Length.selector, uint256(0)));
+        vm.prank(alice);
+        registry.guardedIssueUpdate(regId, 0, _g1("I"), "", DIGEST);
 
         assertEq(_version(regId), 0);
     }

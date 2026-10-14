@@ -51,8 +51,8 @@ contract StateRegistry {
 
     event RegistryCreated(bytes32 indexed registryId, bytes32 indexed credDefId, bytes32 label, bytes V0, bytes Qtilde, bytes Q);
     event SrsPublished(bytes32 indexed registryId, uint32 degree, bytes32 srsHash, bytes[] g1Powers, bytes[] g2Powers);
-    event Issued(bytes32 indexed registryId, uint64 indexed version, bytes newI, bytes newWIR);
-    // guardDigest = 0 a nem őrzött revokálásnál; egyébként keccak256(abi.encode(query, proof))
+    // guardDigest = 0 a nem őrzött kiadásnál/revokálásnál; egyébként keccak256(abi.encode(query, proof))
+    event Issued(bytes32 indexed registryId, uint64 indexed version, bytes newI, bytes newWIR, bytes32 guardDigest);
     event Revoked(bytes32 indexed registryId, uint64 indexed version, bytes32 indexed y, bytes newA, bytes newRtilde, bytes newWIR, bytes32 guardDigest);
     event GroupCreated(bytes32 indexed groupId, bytes32 indexed registryId, address indexed creator, bytes32 label, bytes32[] members);
 
@@ -158,14 +158,19 @@ contract StateRegistry {
     function issueUpdate(bytes32 registryId, bytes calldata newI, bytes calldata newWIR)
         external onlyIssuer(registryId) whenInitialized(registryId)
     {
-        _checkG1(newI);
-        _checkG1(newWIR);
-        Registry storage r = registries[registryId];
-        r.I = newI;
-        r.WIR = newWIR;
-        r.version += 1;                                  // a kiadás is új version (SP-L-c-21)
-        valuesHashes[registryId][r.version] = _valuesHash(r);
-        emit Issued(registryId, r.version, newI, newWIR);
+        _applyIssue(registryId, newI, newWIR, bytes32(0));
+    }
+
+    function guardedIssueUpdate(
+        bytes32 registryId,
+        uint64 expectedVersion,
+        bytes calldata newI,
+        bytes calldata newWIR,
+        bytes32 guardDigest
+    ) external onlyIssuer(registryId) whenInitialized(registryId) {
+        uint64 current = registries[registryId].version;
+        if (current != expectedVersion) revert StaleVersion(expectedVersion, current);   // compare
+        _applyIssue(registryId, newI, newWIR, guardDigest);                                // swap
     }
 
 
@@ -351,6 +356,17 @@ contract StateRegistry {
         if (didRegistry.identityOwner(credDefRegistry.issuerOf(credDefId)) != msg.sender) {
             revert NotIssuer(credDefId, msg.sender);
         }
+    }
+
+    function _applyIssue(bytes32 registryId, bytes calldata newI, bytes calldata newWIR, bytes32 guardDigest) private {
+        _checkG1(newI);
+        _checkG1(newWIR);
+        Registry storage r = registries[registryId];
+        r.I = newI;
+        r.WIR = newWIR;
+        r.version += 1;                                  // a kiadás is új version (SP-L-c-21)
+        valuesHashes[registryId][r.version] = _valuesHash(r);
+        emit Issued(registryId, r.version, newI, newWIR, guardDigest);
     }
 
     function _applyRevoke(
