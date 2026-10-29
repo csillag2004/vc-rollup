@@ -6,8 +6,9 @@ import {PolicyRegistry} from "./PolicyRegistry.sol";
 import {BLS} from "./lib/BLS.sol";
 
 /// Három akkumulátoros állapotregiszter (A, R̃, I) CredDef-partíciónként.
-/// Verify on write: minden frissítést a contract EIP-2537 pairinggel ellenőriz,
-/// a guardolt frissítéseknél pedig a policy szerinti compare-and-swap fut.
+/// Verify on write: minden frissítést a contract EIP-2537 pairinggel és a tárolóval ellenőriz.
+/// A guardolt frissítésnél a policy nyilvános részét a contract kiértékeli, a bemutatott részre
+/// pedig a contract által számolt osztály szerinti compare-and-swap fut.
 contract StateRegistry {
 
     struct Registry {
@@ -78,7 +79,7 @@ contract StateRegistry {
     error ConsistencyCheckFailed();
     error SubsetCheckFailed();
     error StaleVersion(uint256 index, uint64 expected, uint64 current);
-    error StaleGroupVersion(bytes32 groupId, uint64 expected, uint64 current);
+    error GuardFalse(bytes32 policyId);
     error PolicyRequired(bytes32 policyId);
     error WrongPolicy(bytes32 expected, bytes32 given);
     error GuardLengthMismatch(uint256 bindings, uint256 versions);
@@ -461,40 +462,80 @@ contract StateRegistry {
     }
 
     /// Guard: ha a CredDef-hez az adott művelethez policy van kötve, csak az fogadható el.
-    /// A CAS-módot a policy adja: None = nincs összehasonlítás (stable guard),
-    /// Group = minden kötött csoport verziója, Global = minden kötött registry (vagy a csoport registryjének) verziója.
+    /// (1) A bemutatott rész CAS-a: ha nem stable (és nem állapotfüggetlen), minden Presented klóz
+    ///     registryjének globális versionje egyezzen a várttal.
+    /// (2) A nyilvános rész a frissítés előtti állapotban igaz legyen; csoportra és Issued-ra számlálókkal.
     function _checkGuard(bytes32 credDefId, PolicyRegistry.Action action, Guard calldata guard)
         private view returns (bytes32)
     {
         bytes32 bound = policyRegistry.boundPolicy(credDefId, action);
         if (bound != bytes32(0) && bound != guard.policyId) revert WrongPolicy(bound, guard.policyId);
-        (PolicyRegistry.CasMode mode, PolicyRegistry.BindingKind[] memory kinds, bytes32[] memory targets) =
-            policyRegistry.guardInfo(guard.policyId);
+        (
+            PolicyRegistry.Class cls,
+            PolicyRegistry.BindingKind[] memory kinds,
+            bytes32[] memory targets,
+            PolicyRegistry.Op[] memory presentedOps,
+            PolicyRegistry.Op[] memory publicOps
+        ) = policyRegistry.guardSpec(guard.policyId);
         if (guard.expectedVersions.length != targets.length) {
             revert GuardLengthMismatch(targets.length, guard.expectedVersions.length);
         }
-        if (mode != PolicyRegistry.CasMode.None) {
-            for (uint256 i = 0; i < targets.length; i++) {
-                if (kinds[i] == PolicyRegistry.BindingKind.CredDef) continue;
-                uint64 expected = guard.expectedVersions[i];
-                if (kinds[i] == PolicyRegistry.BindingKind.Group && mode == PolicyRegistry.CasMode.Group) {
-                    uint64 gv = groupVersion(targets[i]);
-                    if (gv != expected) revert StaleGroupVersion(targets[i], expected, gv);
-                } else {
-                    bytes32 regId = kinds[i] == PolicyRegistry.BindingKind.Group ? _groupRegistry(targets[i]) : targets[i];
-                    if (registries[regId].createdAt == 0) revert UnknownRegistry(regId);
-                    uint64 current = registries[regId].version;
-                    if (current != expected) revert StaleVersion(i, expected, current);
-                }
+        if (cls == PolicyRegistry.Class.CoStable || cls == PolicyRegistry.Class.Volatile) {
+            for (uint256 i = 0; i < presentedOps.length; i++) {
+                if (presentedOps[i].kind != PolicyRegistry.OpKind.Clause) continue;
+                uint8 b = presentedOps[i].binding;
+                if (kinds[b] != PolicyRegistry.BindingKind.Registry) continue;
+                bytes32 regId = targets[b];
+                if (registries[regId].createdAt == 0) revert UnknownRegistry(regId);
+                uint64 current = registries[regId].version;
+                if (current != guard.expectedVersions[b]) revert StaleVersion(b, guard.expectedVersions[b], current);
             }
         }
+        if (!_evalPublic(publicOps, targets)) revert GuardFalse(guard.policyId);
         return keccak256(abi.encode(guard.policyId, guard.proofHash));
     }
 
-    function _groupRegistry(bytes32 groupId) private view returns (bytes32) {
-        Group storage g = groups[groupId];
+    /// Postfix kiértékelés. Klóz: n = a domain mérete, r = benne a visszavontak száma;
+    /// Up törzsre m = r, Down törzsre m = n − r; ∀: m = n, ∃: m ≥ 1, atleast k: m ≥ k, atmost k: m ≤ k.
+    function _evalPublic(PolicyRegistry.Op[] memory ops, bytes32[] memory targets) private view returns (bool) {
+        if (ops.length == 0) return true;
+        bool[] memory stack = new bool[](ops.length);
+        uint256 depth = 0;
+        for (uint256 i = 0; i < ops.length; i++) {
+            PolicyRegistry.Op memory op = ops[i];
+            if (op.kind == PolicyRegistry.OpKind.Clause) {
+                stack[depth++] = _evalClause(op, targets[op.binding]);
+            } else {
+                bool a = stack[depth - 2];
+                bool b = stack[depth - 1];
+                stack[depth - 2] = op.kind == PolicyRegistry.OpKind.And ? a && b : a || b;
+                depth--;
+            }
+        }
+        return stack[0];
+    }
+
+    function _evalClause(PolicyRegistry.Op memory op, bytes32 target) private view returns (bool) {
+        uint256 n;
+        uint256 r;
+        if (op.domain == PolicyRegistry.Domain.Group) {
+            n = _group(target).members.length;
+            r = groupVersion(target);
+        } else {
+            if (registries[target].createdAt == 0) revert UnknownRegistry(target);
+            n = issuedCount(target);
+            r = revokedCount(target);
+        }
+        uint256 m = op.body == PolicyRegistry.Polarity.Up ? r : n - r;
+        if (op.quant == PolicyRegistry.Quant.All) return m == n;
+        if (op.quant == PolicyRegistry.Quant.Exists) return m >= 1;
+        if (op.quant == PolicyRegistry.Quant.AtLeast) return m >= op.k;
+        return m <= op.k;
+    }
+
+    function _group(bytes32 groupId) private view returns (Group storage g) {
+        g = groups[groupId];
         if (g.createdAt == 0) revert UnknownGroup(groupId);
-        return g.registryId;
     }
 
     /// g̃^y · Q̃

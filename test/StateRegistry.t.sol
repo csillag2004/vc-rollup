@@ -588,8 +588,7 @@ contract StateRegistryTest is Test {
         vm.expectRevert(PolicyRegistry.MalformedProgram.selector);
         policies.registerPolicy("q", g, _none(), two);
 
-        PolicyRegistry.Op memory badIdx = ok;
-        badIdx.binding = 1;
+        PolicyRegistry.Op memory badIdx = _clause(PolicyRegistry.Quant.All, 0, PolicyRegistry.Domain.Group, 1, PolicyRegistry.Polarity.Down);
         vm.expectRevert(abi.encodeWithSelector(PolicyRegistry.BadBinding.selector, 0));
         policies.registerPolicy("q", g, _none(), _ops(badIdx));
 
