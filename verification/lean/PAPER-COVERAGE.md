@@ -48,6 +48,16 @@ The script places notes by text, so it applies on top of other review layers tha
 - S9 entirely; the availability, trapdoor and privacy parts of S1, S4 and S10; the unforgeability part of S6. `CONTRACT.md` gives the reason for each.
 - The inherited claims I1–I7 are assumptions of the model, not targets.
 
+## Caveat: the issuer holds α
+
+`CONTRACT.md` says that check (5) rejects a double revocation "because the issuer cannot compute the quotient `W_IR`". That is true only of parties without α. The issuer holds α, so it can compute `W_IR = g^{P_Iss(α)/P_Rev(α)}` for any two sets, and check (5) then passes after it revokes an ID that was never issued or that is already revoked.
+
+The proofs are unaffected. The model assumes that each check decides its set relation exactly, and the theorems rest on that assumption, not on the pairing. What changes is the mechanism that makes the assumption true against the issuer. In the contract of [vc-rollup#4](https://github.com/csillag2004/vc-rollup/pull/4), storage records which IDs are issued and which are revoked and checks both relations directly (`AlreadyIssued`, `NotIssued`, `AlreadyRevoked`). `test_issuerWithAlphaCannotRevokeUnissued` builds the forged `W_IR` from α and expects `NotIssued`. The same storage check settles the `repeated-issuance` judgment below.
+
+The same contract fixes a group's members at creation and accepts only issued IDs. `both_rejected` issues into a group, so it describes a run the contract no longer allows.
+
+`CONTRACT.md` is sealed, so its sentence stays as it is and this caveat stands beside it.
+
 ## Findings without a theorem
 
 These are the `judgment` items of `paper-todos.json`:
