@@ -1,10 +1,10 @@
-// Desugaring, negation normal form, classification (thesis Lemmas atom-classes and closure,
-// extended with the polarity rules for the Issued domain) and the CAS mode a guard needs.
+// Desugaring, negation normal form, constant folding, classification (thesis Lemmas atom-classes and
+// closure, extended with the polarity rules for the Issued domain) and the freshness check a reader needs.
 import { type Formula, type Domain, DUAL, isRegAtom, domainsOf, freeVars } from './ast.ts';
 
 /**
- * The system model: every domain holds issued credentials only (groups are anchored over issued IDs,
- * a presented credential carries the issuer's signature, and Issued is the issued set). Then
+ * The system model: every domain holds issued credentials only (createGroup checks every member in
+ * storage, a presented credential carries the issuer's signature, and Issued is the issued set). Then
  * Issued(x) is constantly true for a bound x. The thesis' general model (groups of arbitrary IDs)
  * is kept as an option for the exhaustive check.
  */
@@ -12,12 +12,18 @@ export interface Model { domainsIssued: boolean }
 export const SYSTEM_MODEL: Model = { domainsIssued: true };
 
 /**
- * Active(x) = Issued(x) ∧ NotRevoked(x) (thesis notation). In the system model the Issued(x)
- * conjunct is constantly true for a bound x, which the polarity and the compiler take into account.
+ * The system model has one status atom, Revoked(x), with NotRevoked(x) its negation (design/GUARDS.md):
+ * every domain holds issued IDs only, so Issued(x) is true, NotIssued(x) false and Active(x) = NotRevoked(x)
+ * for a bound x. The general model keeps Active(x) = Issued(x) ∧ NotRevoked(x) and both Issued atoms.
  */
 export function desugar(f: Formula, m: Model = SYSTEM_MODEL): Formula {
   switch (f.t) {
     case 'atom':
+      if (m.domainsIssued) {
+        if (f.name === 'Active') return { t: 'atom', name: 'NotRevoked', args: f.args };
+        if (f.name === 'Issued' || f.name === 'NotIssued') return { t: 'const', v: f.name === 'Issued' };
+        return f;
+      }
       if (f.name !== 'Active') return f;
       return { t: 'and', fs: [{ t: 'atom', name: 'Issued', args: f.args }, { t: 'atom', name: 'NotRevoked', args: f.args }] };
     case 'not': return { t: 'not', f: desugar(f.f, m) };
@@ -54,8 +60,32 @@ export function nnf(f: Formula, neg = false): Formula {
   }
 }
 
+/** constant folding; a quantifier folds only where its value does not depend on the domain */
+export function fold(f: Formula): Formula {
+  switch (f.t) {
+    case 'and': case 'or': {
+      // true is the unit of ∧ and absorbs ∨; false the other way round
+      const unit = f.t === 'and';
+      const fs: Formula[] = [];
+      for (const g of f.fs.map(fold)) {
+        if (g.t !== 'const') fs.push(g);
+        else if (g.v !== unit) return g;
+      }
+      return fs.length === 0 ? { t: 'const', v: unit } : fs.length === 1 ? fs[0]! : { t: f.t, fs };
+    }
+    case 'quant': {
+      const body = fold(f.body);
+      if (body.t === 'const' && body.v && f.q === 'forall') return body;
+      if (body.t === 'const' && !body.v && f.q !== 'forall') return { t: 'const', v: f.q === 'atmost' || (f.q === 'atleast' && f.k === 0) };
+      return { ...f, body };
+    }
+    case 'not': return { t: 'not', f: fold(f.f) };
+    default: return f;
+  }
+}
+
 export function normalise(f: Formula, m: Model = SYSTEM_MODEL): Formula {
-  return nnf(desugar(f, m));
+  return fold(nnf(desugar(f, m)));
 }
 
 // ---- classification ----
@@ -67,21 +97,20 @@ const join = (a: Pol, b: Pol): Pol => (a === 'neutral' ? b : b === 'neutral' ? a
 const flip = (a: Pol): Pol => (a === 'up' ? 'down' : a === 'down' ? 'up' : a);
 
 /** polarity: ↑ true stays true along ⊑ (stable), ↓ false stays false (co-stable) */
-export function polarity(f: Formula, m: Model = SYSTEM_MODEL): Pol {
+export function polarity(f: Formula): Pol {
   switch (f.t) {
     case 'const': return 'neutral';
     case 'atom':
-      // in the system model Issued(x) / NotIssued(x) of a bound x are constants
-      if ((f.name === 'Issued' || f.name === 'NotIssued') && m.domainsIssued) return 'neutral';
+      // Issued and NotIssued survive normalisation in the general model only
       if (f.name === 'Revoked' || f.name === 'Issued') return 'up';
       if (f.name === 'NotRevoked' || f.name === 'NotIssued') return 'down';
       if (f.name === 'Active') return 'mixed';
       return 'neutral';
-    case 'not': return flip(polarity(f.f, m));
-    case 'and': case 'or': return f.fs.map((g) => polarity(g, m)).reduce(join, 'neutral');
-    case 'implies': return join(flip(polarity(f.a, m)), polarity(f.b, m));
+    case 'not': return flip(polarity(f.f));
+    case 'and': case 'or': return f.fs.map((g) => polarity(g)).reduce(join, 'neutral');
+    case 'implies': return join(flip(polarity(f.a)), polarity(f.b));
     case 'quant': {
-      const b = polarity(f.body, m);
+      const b = polarity(f.body);
       if (f.dom.kind !== 'issued') return f.q === 'atmost' ? flip(b) : b;
       // the Issued domain grows: a hidden NotIssued under ∀, a hidden Issued under ∃ / at least
       if (f.q === 'forall') return join('down', b);
@@ -91,21 +120,25 @@ export function polarity(f: Formula, m: Model = SYSTEM_MODEL): Pol {
   }
 }
 
+export const classOf = (p: Pol): FormulaClass =>
+  (p === 'neutral' ? 'state-independent' : p === 'up' ? 'stable' : p === 'down' ? 'co-stable' : 'volatile');
+
 export function classify(f: Formula, m: Model = SYSTEM_MODEL): FormulaClass {
-  const p = polarity(normalise(f, m), m);
-  return p === 'neutral' ? 'state-independent' : p === 'up' ? 'stable' : p === 'down' ? 'co-stable' : 'volatile';
+  return classOf(polarity(normalise(f, m)));
 }
 
 export type CasMode = 'none' | 'group' | 'global';
 
 /**
- * Which comparison a guard needs (thesis Def. fresh guard):
- * stable / state-independent: none; all domains are groups: group versions; otherwise global versions.
+ * How a reader checks that an off-chain presentation is still fresh (thesis Def. fresh guard):
+ * stable / state-independent: no comparison; all domains are groups: group versions; otherwise global
+ * versions. The contract does not use it: it evaluates the public part of a guard itself and compares
+ * registry versions for a co-stable or volatile presented part only (design/GUARDS.md).
  */
 export function casMode(f: Formula, m: Model = SYSTEM_MODEL): CasMode {
   const c = classify(f, m);
   if (c === 'stable' || c === 'state-independent') return 'none';
-  return domainsOf(f).every((d) => d.kind === 'group') ? 'group' : 'global';
+  return domainsOf(normalise(f, m)).every((d) => d.kind === 'group') ? 'group' : 'global';
 }
 
 export function wellFormed(f: Formula): string[] {
