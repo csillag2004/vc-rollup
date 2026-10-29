@@ -35,11 +35,11 @@ contract StateRegistry {
         uint256 createdAt;
     }
 
-    /// guard: melyik policy alapján, a kötések szerinti várt verziók, és a bizonyítás hash-e
+    /// guard: melyik policy alapján, a kötések szerinti várt verziók, és maga a bizonyítás (láncra kerül)
     struct Guard {
         bytes32 policyId;
         uint64[] expectedVersions;
-        bytes32 proofHash;
+        bytes proof;
     }
 
     CredDefRegistry public immutable credDefRegistry;
@@ -57,9 +57,11 @@ contract StateRegistry {
 
     event RegistryCreated(bytes32 indexed registryId, bytes32 indexed credDefId, bytes32 label, bytes V0, bytes Qtilde, bytes Q);
     event SrsPublished(bytes32 indexed registryId, uint32 degree, bytes[] g1Powers, bytes[] g2Powers);
-    // guardDigest = 0 a nem őrzött frissítésnél; egyébként keccak256(abi.encode(policyId, proofHash))
+    // guardDigest = 0 a nem őrzött frissítésnél; egyébként keccak256(abi.encode(policyId, keccak256(proof)))
     event Issued(bytes32 indexed registryId, uint64 indexed version, bytes32 indexed y, bytes newI, bytes newWIR, bytes32 guardDigest);
     event Revoked(bytes32 indexed registryId, uint64 indexed version, bytes32 indexed y, bytes newA, bytes newRtilde, bytes newWIR, bytes32 guardDigest);
+    // a guardolt frissítés bizonyítása; version a frissítés utáni
+    event GuardProof(bytes32 indexed registryId, uint64 indexed version, bytes32 indexed policyId, bytes proof);
     event GroupCreated(bytes32 indexed groupId, bytes32 indexed registryId, address indexed creator, bytes32 label, bytes32[] members);
 
     error ZeroAddress();
@@ -199,6 +201,7 @@ contract StateRegistry {
     ) external onlyIssuer(registryId) whenInitialized(registryId) {
         bytes32 digest = _checkGuard(registries[registryId].credDefId, PolicyRegistry.Action.Issue, guard);
         _applyIssue(registryId, y, newI, newWIR, digest);
+        emit GuardProof(registryId, registries[registryId].version, guard.policyId, guard.proof);
     }
 
 
@@ -226,6 +229,7 @@ contract StateRegistry {
     ) external onlyIssuer(registryId) {
         bytes32 digest = _checkGuard(registries[registryId].credDefId, PolicyRegistry.Action.Revoke, guard);
         _applyRevoke(registryId, y, newA, newRtilde, newWIR, digest);
+        emit GuardProof(registryId, registries[registryId].version, guard.policyId, guard.proof);
     }
 
 
@@ -492,7 +496,7 @@ contract StateRegistry {
             }
         }
         if (!_evalPublic(publicOps, targets)) revert GuardFalse(guard.policyId);
-        return keccak256(abi.encode(guard.policyId, guard.proofHash));
+        return keccak256(abi.encode(guard.policyId, keccak256(guard.proof)));
     }
 
     /// Postfix kiértékelés. Klóz: n = a domain mérete, r = benne a visszavontak száma;
