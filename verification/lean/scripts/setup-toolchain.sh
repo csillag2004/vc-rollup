@@ -1,52 +1,45 @@
 #!/usr/bin/env bash
-# Install the pinned Lean release into ./tools without elan, verifying the archive hash.
-# Idempotent: an existing download or installation is checked and reused.
+# Installs Lean 4.23.0 (linux-x86_64) under ./tools without elan and checks the release
+# tarball against its pinned SHA-256. Rerunning reuses a verified download and install.
 set -euo pipefail
 
-ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-VERSION="4.23.0"
-ARCHIVE_NAME="lean-${VERSION}-linux.tar.zst"
-ARCHIVE_URL="https://github.com/leanprover/lean4/releases/download/v${VERSION}/${ARCHIVE_NAME}"
-ARCHIVE_SHA256="ecd028d6f642b61b451c8687aeeb24dd53789fbfdcb7d4adb8f5cf60eb2022ba"
-TOOLS_DIR="$ROOT/tools"
-ARCHIVE_PATH="$TOOLS_DIR/$ARCHIVE_NAME"
-INSTALL_DIR="$TOOLS_DIR/lean-${VERSION}"
+lean_version=4.23.0
+release="lean-$lean_version-linux"
+pinned_sha=ecd028d6f642b61b451c8687aeeb24dd53789fbfdcb7d4adb8f5cf60eb2022ba
+dest="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)/tools"
+tarball="$dest/$release.tar.zst"
+prefix="$dest/lean-$lean_version"
 
-if [[ "$(uname -sm)" != "Linux x86_64" ]]; then
-  echo "This script installs the linux-x86_64 release; on other platforms use elan, which reads lean-toolchain." >&2
+if [[ "$(uname -s)/$(uname -m)" != Linux/x86_64 ]]; then
+  echo "linux-x86_64 only; elsewhere use elan, which reads lean-toolchain" >&2
   exit 1
 fi
-for tool in curl tar zstd sha256sum; do
-  command -v "$tool" >/dev/null || { echo "Missing required tool: $tool" >&2; exit 1; }
+for need in curl tar zstd sha256sum; do
+  command -v "$need" >/dev/null || { echo "missing: $need" >&2; exit 1; }
 done
 
-mkdir -p "$TOOLS_DIR"
-if [[ ! -f "$ARCHIVE_PATH" ]]; then
-  curl --fail --location --retry 3 --output "$ARCHIVE_PATH.part" "$ARCHIVE_URL"
-  mv "$ARCHIVE_PATH.part" "$ARCHIVE_PATH"
+mkdir -p "$dest"
+if ! [[ -f "$tarball" ]]; then
+  curl -fL --retry 3 -o "$tarball.part" \
+    "https://github.com/leanprover/lean4/releases/download/v$lean_version/$release.tar.zst"
+  mv -- "$tarball.part" "$tarball"
 fi
-
-actual="$(sha256sum "$ARCHIVE_PATH" | cut -d ' ' -f 1)"
-if [[ "$actual" != "$ARCHIVE_SHA256" ]]; then
-  echo "Archive checksum mismatch: expected $ARCHIVE_SHA256, got $actual" >&2
+if ! echo "$pinned_sha  $tarball" | sha256sum --check --quiet -; then
+  echo "checksum mismatch for $tarball; delete it and rerun" >&2
   exit 1
 fi
 
-if [[ ! -x "$INSTALL_DIR/bin/lean" ]]; then
-  if [[ -e "$INSTALL_DIR" ]]; then
-    echo "Incomplete installation at $INSTALL_DIR; remove it and rerun." >&2
-    exit 1
-  fi
-  tmp="$(mktemp -d "$TOOLS_DIR/.extract.XXXXXX")"
-  trap 'rm -rf "$tmp"' EXIT
-  tar --zstd -xf "$ARCHIVE_PATH" -C "$tmp"
-  mv "$tmp/lean-${VERSION}-linux" "$INSTALL_DIR"
+if ! [[ -x "$prefix/bin/lean" ]]; then
+  [[ ! -e "$prefix" ]] || { echo "partial install at $prefix; delete it and rerun" >&2; exit 1; }
+  scratch="$(mktemp -d "$dest/unpack.XXXXXX")"
+  trap 'rm -rf -- "$scratch"' EXIT
+  zstd -dc -- "$tarball" | tar -x -C "$scratch"
+  mv -- "$scratch/$release" "$prefix"
 fi
 
-version_output="$("$INSTALL_DIR/bin/lean" --version)"
-if [[ "$version_output" != *"version ${VERSION},"* ]]; then
-  echo "Unexpected Lean version: $version_output" >&2
-  exit 1
-fi
-echo "$version_output"
-echo "Add to PATH: $INSTALL_DIR/bin"
+got="$("$prefix/bin/lean" --version)"
+case "$got" in
+  *"version $lean_version,"*) ;;
+  *) echo "unexpected lean: $got" >&2; exit 1 ;;
+esac
+printf '%s\nPATH entry: %s\n' "$got" "$prefix/bin"
