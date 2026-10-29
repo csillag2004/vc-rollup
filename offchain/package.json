@@ -14,7 +14,8 @@
     "eval:gas": "node eval/gas.ts",
     "eval:report": "node eval/report.ts",
     "demo:op-sepolia": "node eval/op-sepolia.ts",
-    "bdd": "cucumber-js"
+    "bdd": "cucumber-js",
+    "bdd:op-sepolia": "TARGET=op-sepolia cucumber-js"
   },
   "dependencies": {
     "@digitalbazaar/bbs-signatures": "^3.1.0",

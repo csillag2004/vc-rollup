@@ -2,30 +2,21 @@
 // transaction (L2 execution gas and fee, L1 data fee). Writes design/OP-SEPOLIA-RUN.md.
 //
 // Usage: PRIVATE_KEY in ../.env (a funded OP Sepolia account), then   node eval/op-sepolia.ts
-import { writeFileSync, readFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { ethers } from 'ethers';
-import { attach, type ContractName } from '../src/chain/client.ts';
-import { liveProvider, RecordingWallet, txCost, type TxCost } from '../src/chain/live.ts';
+import type { ContractName } from '../src/chain/client.ts';
+import { connectLive, txCost, type TxCost } from '../src/chain/live.ts';
 import { runFlatReservation } from './flat-reservation.ts';
 
 const ROOT = new URL('../../', import.meta.url);
 const OUT = new URL('design/OP-SEPOLIA-RUN.md', ROOT);
 
-interface DeploymentFile { chainId: number; rpc: string; explorer: string; fromBlock: number; contracts: Record<ContractName, string> }
-
 const median = (xs: bigint[]): bigint => [...xs].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))[Math.floor(xs.length / 2)]!;
 const eth = (wei: bigint): string => ethers.formatEther(wei);
 
 async function main(): Promise<void> {
-  process.loadEnvFile(new URL('.env', ROOT));
-  const raw = process.env.PRIVATE_KEY;
-  if (!raw) throw new Error('PRIVATE_KEY missing from .env');
-  const dep = JSON.parse(readFileSync(new URL('deployments/11155420.json', ROOT), 'utf8')) as DeploymentFile;
-
-  const provider = await liveProvider(dep.rpc, dep.chainId);
-  const wallet = new RecordingWallet(raw.startsWith('0x') ? raw : `0x${raw}`, provider);
+  const { dep, provider, wallet, d } = await connectLive();
   const before = await provider.getBalance(wallet.address);
-  const d = attach(dep.contracts, wallet, dep.fromBlock);
   const tag = `-${Date.now().toString(36)}`;
   const started = new Date();
 

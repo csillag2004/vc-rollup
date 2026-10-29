@@ -28,6 +28,7 @@ cd offchain && npm test           # off-chain tests
 anvil --hardfork prague &         # local chain with EIP-2537
 npm run demo                      # flat reservation end to end
 npm run bdd                       # Gherkin scenarios (offchain/features) on the local chain
+npm run bdd:op-sepolia            # the same scenarios on OP Sepolia (deployed contracts, PRIVATE_KEY in .env)
 npm run eval:report               # regenerates design/EVALUATION.md
 ```
 

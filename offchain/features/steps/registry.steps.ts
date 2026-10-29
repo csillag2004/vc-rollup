@@ -17,7 +17,8 @@ Given('a landlord with a BBS key published in its DID document', async function 
 
 Given('a schema {string} version {string} with attributes {string} and {string}',
   async function (this: ReservationWorld, name: string, version: string, a: string, b: string) {
-    this.schemas.set(name, await this.landlord.registerSchema(name, version, [a, b]));
+    // the scenario's own schema: on a shared chain the same name from the same sender would collide
+    this.schemas.set(name, await this.landlord.registerSchema(`${name}-${this.label}`, version, [a, b]));
   });
 
 Given('the landlord registers a CredDef for the schema {string}', async function (this: ReservationWorld, name: string) {
