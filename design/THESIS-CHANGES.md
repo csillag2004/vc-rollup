@@ -9,7 +9,7 @@ Reference: `TDK26-Kocsis-Kamilla/content/proposed-approach.tex`, `background.tex
 
 ## 3.1 System model, 3.4 VDR
 4. `def:representation`, `def:accumulator-updates`: `A = V0^{1/P_Rev(α)}` (static add); issuing changes only I (and `W_IR`). Fix `lem:representation` accordingly.
-5. Groups (def:domains, first item): a finite set of **already issued** credential IDs, fixed by a party other than the prover, anchored in the VDR with an on-chain subset check `e(W_S, [P_S]_2) = e(I, g̃)`.
+5. Groups (def:domains, first item): a finite set of **already issued** credential IDs, fixed by a party other than the prover, anchored in the VDR with an on-chain subset check `e(W_S, [P_S]_2) = e(I, g̃)`. Scope: `W_S = I^{1/P_S(α)}` can be computed for *any* set by whoever knows α, so the check binds an honest issuer only (like every check that compares values at α); without α, `W_S` needs the whole issued set, so in practice only the issuer anchors groups.
 6. `def:group-version`: say explicitly that, by 5., the only update that can touch a member is revocation.
 7. VDR components: add the PolicyRegistry and CredDef-level rules (policy bound to issue / revoke / present). Consider a new claim in the S1–S10 table ("policy-enforced lifecycle").
 

@@ -53,8 +53,9 @@ contract StateRegistryTest is Test {
         vm.prank(alice);
         credDefId = credDefRegistry.registerCredDef(alice, schemaId, "default", keccak256("alice#bbs-key-1"));
 
+        (bytes memory v0, bytes memory qt, bytes memory q) = _keys(ALPHA);
         vm.prank(alice);
-        regId = registry.createRegistry(credDefId, LABEL, _v0(), BLS.g2Mul(BLS.g2(), ALPHA), BLS.g1Mul(BLS.g1(), ALPHA));
+        regId = registry.createRegistry(credDefId, LABEL, v0, qt, q);
         (bytes[] memory p1, bytes[] memory p2) = _srs(SRS_DEGREE);
         vm.prank(alice);
         registry.publishSrs(regId, p1, p2);
@@ -65,6 +66,12 @@ contract StateRegistryTest is Test {
     }
 
     // ------------------------------------------------------------ segédfüggvények
+
+    function _keys(uint256 alphaG1) internal view returns (bytes memory v0, bytes memory qt, bytes memory q) {
+        v0 = _v0();
+        qt = BLS.g2Mul(BLS.g2(), ALPHA);
+        q = BLS.g1Mul(BLS.g1(), alphaG1);
+    }
 
     function _v0() internal view returns (bytes memory) {
         return BLS.g1Mul(BLS.g1(), V0_DLOG);
@@ -170,20 +177,23 @@ contract StateRegistryTest is Test {
     }
 
     function test_createRegistryKeyMismatchReverts() public {
+        (bytes memory v0, bytes memory qt, bytes memory q) = _keys(ALPHA + 1);
         vm.prank(alice);
         vm.expectRevert(StateRegistry.KeyMismatch.selector);
-        registry.createRegistry(credDefId, keccak256("other"), _v0(), BLS.g2Mul(BLS.g2(), ALPHA), BLS.g1Mul(BLS.g1(), ALPHA + 1));
+        registry.createRegistry(credDefId, keccak256("other"), v0, qt, q);
     }
 
     function test_createRegistryOnlyIssuer() public {
+        (bytes memory v0, bytes memory qt, bytes memory q) = _keys(ALPHA);
         vm.prank(bob);
         vm.expectRevert(abi.encodeWithSelector(StateRegistry.NotIssuer.selector, credDefId, bob));
-        registry.createRegistry(credDefId, keccak256("other"), _v0(), BLS.g2Mul(BLS.g2(), ALPHA), BLS.g1Mul(BLS.g1(), ALPHA));
+        registry.createRegistry(credDefId, keccak256("other"), v0, qt, q);
     }
 
     function test_publishSrsRejectsWrongPowers() public {
+        (bytes memory v0, bytes memory qt, bytes memory q) = _keys(ALPHA);
         vm.prank(alice);
-        bytes32 r2 = registry.createRegistry(credDefId, keccak256("p2"), _v0(), BLS.g2Mul(BLS.g2(), ALPHA), BLS.g1Mul(BLS.g1(), ALPHA));
+        bytes32 r2 = registry.createRegistry(credDefId, keccak256("p2"), v0, qt, q);
         (bytes[] memory p1, bytes[] memory p2) = _srs(3);
         p1[3] = BLS.g1Mul(BLS.g1(), 99);
         vm.prank(alice);
@@ -261,25 +271,28 @@ contract StateRegistryTest is Test {
     function test_revokeWrongStepReverts() public {
         _issue(Y1);
         (, bytes memory r, bytes memory w) = _revokeValues(Y1);
+        bytes memory bad = BLS.g1Mul(curA, 7);
         vm.prank(alice);
         vm.expectRevert(StateRegistry.StepCheckFailed.selector);
-        registry.revoke(regId, bytes32(Y1), BLS.g1Mul(curA, 7), r, w);
+        registry.revoke(regId, bytes32(Y1), bad, r, w);
     }
 
     function test_revokeInconsistentRtildeReverts() public {
         _issue(Y1);
         (bytes memory a,, bytes memory w) = _revokeValues(Y1);
+        bytes memory bad = BLS.g2Mul(curR, 7);
         vm.prank(alice);
         vm.expectRevert(StateRegistry.ConsistencyCheckFailed.selector);
-        registry.revoke(regId, bytes32(Y1), a, BLS.g2Mul(curR, 7), w);
+        registry.revoke(regId, bytes32(Y1), a, bad, w);
     }
 
     function test_revokeWrongWIRReverts() public {
         _issue(Y1);
         (bytes memory a, bytes memory r,) = _revokeValues(Y1);
+        bytes memory bad = BLS.g1Mul(curW, 7);
         vm.prank(alice);
         vm.expectRevert(StateRegistry.SubsetCheckFailed.selector);
-        registry.revoke(regId, bytes32(Y1), a, r, BLS.g1Mul(curW, 7));
+        registry.revoke(regId, bytes32(Y1), a, r, bad);
     }
 
     function test_revokeStaleValuesReverts() public {
@@ -323,14 +336,17 @@ contract StateRegistryTest is Test {
         assertEq(registry.groupVersion(g), 1);
     }
 
-    function test_createGroupWithUnissuedReverts() public {
+    /// A tanú α nélkül csak a kiadott halmaz ismeretében számolható; rossz tanúval nincs csoport.
+    /// (α birtokában bármely halmazhoz van tanú: tisztességes issuer mellett köt, mint minden α-beli ellenőrzés.)
+    function test_createGroupWrongWitnessReverts() public {
         _issue(Y1);
-        bytes32[] memory m = _members(Y1, Y2); // Y2 nincs kiadva
+        _issue(Y2);
+        _issue(Y3);
+        bytes memory ws = _groupWitness(_members(Y1, Y2));
         (, bytes[] memory p2) = _srs(SRS_DEGREE);
-        bytes memory ws = _groupWitness(m);
         vm.prank(alice);
         vm.expectRevert(StateRegistry.GroupSubsetCheckFailed.selector);
-        registry.createGroup(regId, LABEL, m, ws, p2);
+        registry.createGroup(regId, LABEL, _members(Y1, Y3), ws, p2);
     }
 
     function test_createGroupUnsortedReverts() public {

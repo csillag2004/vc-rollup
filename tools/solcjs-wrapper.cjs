@@ -1,28 +1,19 @@
-// Native-solc command-line shim over solc-js (npm "solc"), for machines where forge cannot
-// download a native compiler. Supports what forge uses: --version and --standard-json (stdin).
+// Native-solc command-line shim over the solc-js Emscripten build (npm "solc", soljson.js), for
+// machines where forge cannot download a native compiler. Supports what forge uses:
+// --version and --standard-json (input on stdin, all sources inlined by forge).
 const fs = require('fs');
 const path = require('path');
-const solc = require(path.join(__dirname, '..', 'offchain', 'node_modules', 'solc'));
+const soljson = require(path.join(__dirname, '..', 'offchain', 'node_modules', 'solc', 'soljson.js'));
 
+const version = soljson.cwrap('solidity_version', 'string', [])();
 const args = process.argv.slice(2);
 if (args.includes('--version')) {
-  const v = solc.version().replace('.Emscripten.clang', '');
-  process.stdout.write(`solc, the solidity compiler commandline interface\nVersion: ${v}.Linux.g++\n`);
+  process.stdout.write(`solc, the solidity compiler commandline interface\nVersion: ${version.replace('.Emscripten.clang', '')}.Linux.g++\n`);
   process.exit(0);
 }
 if (!args.includes('--standard-json')) {
   process.stderr.write('only --version and --standard-json are supported\n');
   process.exit(1);
 }
-const basePath = (() => { const i = args.indexOf('--base-path'); return i >= 0 ? args[i + 1] : process.cwd(); })();
-const includes = [];
-args.forEach((a, i) => { if (a === '--include-path') includes.push(args[i + 1]); });
-const input = fs.readFileSync(0, 'utf8');
-const findImports = (p) => {
-  for (const root of [basePath, ...includes, process.cwd()]) {
-    const full = path.resolve(root, p);
-    if (fs.existsSync(full)) return { contents: fs.readFileSync(full, 'utf8') };
-  }
-  return { error: `not found: ${p}` };
-};
-process.stdout.write(solc.compile(input, { import: findImports }));
+const compile = soljson.cwrap('solidity_compile', 'string', ['string', 'number', 'number']);
+process.stdout.write(compile(fs.readFileSync(0, 'utf8'), 0, 0));
