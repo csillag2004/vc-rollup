@@ -24,8 +24,8 @@ Time budget: one day. Thesis text is not edited here; the required thesis change
 | Q17 | Formula classes: stable / co-stable / volatile; atoms: monotone / antitone. |
 | Q18 | Several quantifiers / `atleast k` over `Presented` get pairwise distinctness proofs (`y_i ≠ y_j`). |
 | Q19 | Scope = contracts, crypto, language, protocol, flat reservation e2e, evaluation; plus an OP Sepolia deploy script (run only after explicit go). |
-| Q20 | `createGroup` is verified on chain: `e(W_S, [P_S]_2) = e(I, g̃)`, `[P_S]_2` computed by the contract from the members and the G2 SRS. |
-| Q21 | Issuance step check without revealing y: issuer sends `T = I^y` and a Schnorr proof; contract checks `e(I', g̃) = e(T, g̃)·e(I, Q̃)`. |
+| Q20 | *Superseded by [`GUARDS.md`](GUARDS.md): every member must be issued, checked in storage; no `W_S`.* `createGroup` is verified on chain: `e(W_S, [P_S]_2) = e(I, g̃)`, `[P_S]_2` computed by the contract from the members and the G2 SRS. |
+| Q21 | *Superseded by [`GUARDS.md`](GUARDS.md): issuance reveals y, checked in storage and by the step `e(I', g̃) = e(I, g̃^y·Q̃)`.* Issuance step check without revealing y: issuer sends `T = I^y` and a Schnorr proof; contract checks `e(I', g̃) = e(T, g̃)·e(I, Q̃)`. |
 
 ## Layout
 
@@ -83,6 +83,8 @@ Pipeline: parse → desugar (`Active` → `NotRevoked` on our domains) → NNF (
   `(registryId, version, values hash)`.
 
 ## Contract API (new parts)
+
+Issuance, groups, policies and guards changed with [`GUARDS.md`](GUARDS.md); this section describes the API before it.
 
 - `StateRegistry.issueUpdate(registryId, IssueStep step)` with `step = {newI, newWIR, T, R, z}` (Schnorr), and
   `guardedIssueUpdate(registryId, step, Guard g)`.
