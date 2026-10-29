@@ -22,7 +22,7 @@ fi
 lake build --wfail
 
 if [[ -f Audit.lean ]]; then
-  grep -qE '^roots = \[.*"Audit"' lakefile.toml || { echo "Audit is not a root in lakefile.toml" >&2; exit 1; }
+  grep -qF '"Audit"' lakefile.toml || { echo "Audit is not a root in lakefile.toml" >&2; exit 1; }
   missing=0
   while IFS='|' read -r spec thm; do
     if ! grep -qF "#check ($thm : $spec)" Audit.lean; then

@@ -7,4 +7,5 @@ relaxedAutoImplicit = false
 
 [[lean_lib]]
 name = "Lifecycle"
-roots = ["Model"]
+roots = ["Model", "Lifecycle.Registry", "Lifecycle.Formulas", "Lifecycle.Vdr",
+  "Lifecycle.Claims", "Lifecycle.Witnesses", "Lifecycle.Necessity", "Audit"]
