@@ -1,0 +1,25 @@
+{
+  "name": "revoq-offchain",
+  "version": "0.1.0",
+  "private": true,
+  "description": "TDK reference implementation: credential query language, three-accumulator registry, atomic guarded updates",
+  "type": "module",
+  "scripts": {
+    "test": "node --test 'test/**/*.test.ts'",
+    "typecheck": "tsc --noEmit",
+    "eval:classify": "node eval/classify-exhaustive.ts",
+    "eval:toctou": "node eval/toctou.ts",
+    "eval:bench": "node eval/bench.ts",
+    "demo": "node eval/flat-reservation.ts"
+  },
+  "dependencies": {
+    "@digitalbazaar/bbs-signatures": "^3.1.0",
+    "@noble/curves": "1.9.7",
+    "@noble/hashes": "1.8.0",
+    "ethers": "6.15.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.3.0",
+    "typescript": "5.9.2"
+  }
+}

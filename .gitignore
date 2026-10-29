@@ -18,3 +18,6 @@ docs/
 
 /node_modules
 /hellocucumber/node_modules
+
+/offchain/node_modules
+/offchain/.cache
