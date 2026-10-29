@@ -5,7 +5,7 @@
   "description": "TDK reference implementation: credential query language, three-accumulator registry, atomic guarded updates",
   "type": "module",
   "scripts": {
-    "test": "node --test 'test/**/*.test.ts'",
+    "test": "node --test test/*.test.ts",
     "typecheck": "tsc --noEmit",
     "eval:classify": "node eval/classify-exhaustive.ts",
     "eval:toctou": "node eval/toctou.ts",
