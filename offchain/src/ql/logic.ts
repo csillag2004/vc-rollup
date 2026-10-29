@@ -11,13 +11,15 @@ import { type Formula, type Domain, DUAL, isRegAtom, domainsOf, freeVars } from 
 export interface Model { domainsIssued: boolean }
 export const SYSTEM_MODEL: Model = { domainsIssued: true };
 
-/** Active(x) = Issued(x) ∧ NotRevoked(x); in the system model this is NotRevoked(x). */
+/**
+ * Active(x) = Issued(x) ∧ NotRevoked(x) (thesis notation). In the system model the Issued(x)
+ * conjunct is constantly true for a bound x, which the polarity and the compiler take into account.
+ */
 export function desugar(f: Formula, m: Model = SYSTEM_MODEL): Formula {
   switch (f.t) {
     case 'atom':
       if (f.name !== 'Active') return f;
-      return m.domainsIssued ? { t: 'atom', name: 'NotRevoked', args: f.args }
-        : { t: 'and', fs: [{ t: 'atom', name: 'Issued', args: f.args }, { t: 'atom', name: 'NotRevoked', args: f.args }] };
+      return { t: 'and', fs: [{ t: 'atom', name: 'Issued', args: f.args }, { t: 'atom', name: 'NotRevoked', args: f.args }] };
     case 'not': return { t: 'not', f: desugar(f.f, m) };
     case 'and': case 'or': return { t: f.t, fs: f.fs.map((g) => desugar(g, m)) };
     case 'implies': return { t: 'or', fs: [{ t: 'not', f: desugar(f.a, m) }, desugar(f.b, m)] };
