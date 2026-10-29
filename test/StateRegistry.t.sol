@@ -433,11 +433,50 @@ contract StateRegistryTest is Test {
 
     // ------------------------------------------------------------ policy-k és guardolt frissítés
 
-    function _groupPolicy(bytes32 g, PolicyRegistry.Class cls, PolicyRegistry.CasMode mode) internal returns (bytes32) {
-        PolicyRegistry.Binding[] memory b = new PolicyRegistry.Binding[](1);
-        b[0] = PolicyRegistry.Binding({name: "S", kind: PolicyRegistry.BindingKind.Group, target: g});
+    function _clause(PolicyRegistry.Quant q, uint32 k, PolicyRegistry.Domain d, uint8 b, PolicyRegistry.Polarity body)
+        internal pure returns (PolicyRegistry.Op memory op)
+    {
+        op = PolicyRegistry.Op({kind: PolicyRegistry.OpKind.Clause, quant: q, k: k, domain: d, binding: b, body: body});
+    }
+
+    function _connective(PolicyRegistry.OpKind kind) internal pure returns (PolicyRegistry.Op memory op) {
+        op.kind = kind;
+    }
+
+    function _ops(PolicyRegistry.Op memory a) internal pure returns (PolicyRegistry.Op[] memory ops) {
+        ops = new PolicyRegistry.Op[](1);
+        ops[0] = a;
+    }
+
+    function _none() internal pure returns (PolicyRegistry.Op[] memory) {
+        return new PolicyRegistry.Op[](0);
+    }
+
+    function _bind(bytes32 name, PolicyRegistry.BindingKind kind, bytes32 target)
+        internal pure returns (PolicyRegistry.Binding[] memory b)
+    {
+        b = new PolicyRegistry.Binding[](1);
+        b[0] = PolicyRegistry.Binding({name: name, kind: kind, target: target});
+    }
+
+    function _policy(
+        string memory q,
+        PolicyRegistry.Binding[] memory b,
+        PolicyRegistry.Op[] memory pres,
+        PolicyRegistry.Op[] memory pub
+    ) internal returns (bytes32) {
         vm.prank(alice);
-        return policies.registerPolicy("forall x in S. NotRevoked(x)", cls, mode, b);
+        return policies.registerPolicy(q, b, pres, pub);
+    }
+
+    /// ∀x∈S. NotRevoked(x): a foglalás guardja, csak nyilvános rész
+    function _reservationPolicy(bytes32 g) internal returns (bytes32) {
+        return _policy(
+            "forall x in S. NotRevoked(x)",
+            _bind("S", PolicyRegistry.BindingKind.Group, g),
+            _none(),
+            _ops(_clause(PolicyRegistry.Quant.All, 0, PolicyRegistry.Domain.Group, 0, PolicyRegistry.Polarity.Down))
+        );
     }
 
     function _guard(bytes32 policyId, uint64 v) internal pure returns (StateRegistry.Guard memory g) {
@@ -447,120 +486,374 @@ contract StateRegistryTest is Test {
         g.proofHash = keccak256("proof");
     }
 
-    function test_policyCasModeTooWeakReverts() public {
-        PolicyRegistry.Binding[] memory b = new PolicyRegistry.Binding[](1);
-        b[0] = PolicyRegistry.Binding({name: "R", kind: PolicyRegistry.BindingKind.Registry, target: regId});
-        vm.expectRevert(abi.encodeWithSelector(PolicyRegistry.CasModeTooWeak.selector, PolicyRegistry.CasMode.None, PolicyRegistry.CasMode.Global));
-        policies.registerPolicy("forall x in Issued. NotRevoked(x)", PolicyRegistry.Class.CoStable, PolicyRegistry.CasMode.None, b);
-        vm.expectRevert(abi.encodeWithSelector(PolicyRegistry.GroupModeNeedsGroups.selector, 0));
-        policies.registerPolicy("forall x in Issued. NotRevoked(x)", PolicyRegistry.Class.CoStable, PolicyRegistry.CasMode.Group, b);
+    function _bindTo(PolicyRegistry.Action action, bytes32 p) internal {
+        vm.prank(alice);
+        policies.bindPolicy(credDefId, action, p);
+    }
+
+    function _guardedRevoke(uint256 y, StateRegistry.Guard memory g) internal {
+        (bytes memory a, bytes memory r, bytes memory w) = _revokeValues(y);
+        vm.prank(alice);
+        registry.guardedRevoke(regId, bytes32(y), a, r, w, g);
+        curA = a; curR = r; curW = w;
+    }
+
+    function _expectGuardedRevokeReverts(uint256 y, StateRegistry.Guard memory g, bytes memory err) internal {
+        (bytes memory a, bytes memory r, bytes memory w) = _revokeValues(y);
+        vm.prank(alice);
+        vm.expectRevert(err);
+        registry.guardedRevoke(regId, bytes32(y), a, r, w, g);
+    }
+
+    /// a GUARDS.md táblázatának sorai és a négy osztály
+    function test_registerPolicyComputesClass() public {
+        PolicyRegistry.Quant All = PolicyRegistry.Quant.All;
+        PolicyRegistry.Quant Ex = PolicyRegistry.Quant.Exists;
+        PolicyRegistry.Quant AtMost = PolicyRegistry.Quant.AtMost;
+        PolicyRegistry.Domain G = PolicyRegistry.Domain.Group;
+        PolicyRegistry.Domain Iss = PolicyRegistry.Domain.Issued;
+        PolicyRegistry.Domain P = PolicyRegistry.Domain.Presented;
+        PolicyRegistry.Polarity Up = PolicyRegistry.Polarity.Up;
+        PolicyRegistry.Polarity Down = PolicyRegistry.Polarity.Down;
+
+        // foglalás: ∀x∈S. NotRevoked(x) → co-stable
+        assertEq(uint8(policies.classify(_ops(_clause(All, 0, G, 0, Down)))), uint8(PolicyRegistry.Class.CoStable));
+        // a lakás foglalt: ∃x∈S. Revoked(x) → stable
+        assertEq(uint8(policies.classify(_ops(_clause(Ex, 0, G, 0, Up)))), uint8(PolicyRegistry.Class.Stable));
+        // bérlet: ∃x∈Presented. Revoked(x) → stable
+        assertEq(uint8(policies.classify(_ops(_clause(Ex, 0, P, 0, Up)))), uint8(PolicyRegistry.Class.Stable));
+        // a bemutatott még érvényes: ∃x∈Presented. NotRevoked(x) → co-stable
+        assertEq(uint8(policies.classify(_ops(_clause(Ex, 0, P, 0, Down)))), uint8(PolicyRegistry.Class.CoStable));
+        // legfeljebb egy aktív: atmost 1 x∈Issued. NotRevoked(x) → volatile
+        assertEq(uint8(policies.classify(_ops(_clause(AtMost, 1, Iss, 0, Down)))), uint8(PolicyRegistry.Class.Volatile));
+        // senki sincs visszavonva: ∀x∈Issued. NotRevoked(x) → co-stable
+        assertEq(uint8(policies.classify(_ops(_clause(All, 0, Iss, 0, Down)))), uint8(PolicyRegistry.Class.CoStable));
+        // van aktív: ∃x∈Issued. NotRevoked(x) → volatile
+        assertEq(uint8(policies.classify(_ops(_clause(Ex, 0, Iss, 0, Down)))), uint8(PolicyRegistry.Class.Volatile));
+        // mind visszavonva: ∀x∈Issued. Revoked(x) → volatile
+        assertEq(uint8(policies.classify(_ops(_clause(All, 0, Iss, 0, Up)))), uint8(PolicyRegistry.Class.Volatile));
+        // legfeljebb k visszavont: atmost 2 x∈Issued. Revoked(x) → co-stable
+        assertEq(uint8(policies.classify(_ops(_clause(AtMost, 2, Iss, 0, Up)))), uint8(PolicyRegistry.Class.CoStable));
+        // atmost egy fix halmazon megfordít: atmost 1 x∈S. Revoked(x) → co-stable
+        assertEq(uint8(policies.classify(_ops(_clause(AtMost, 1, G, 0, Up)))), uint8(PolicyRegistry.Class.CoStable));
+        // csak hitelesítő atom: ∃x∈Presented. Sig(x) → állapotfüggetlen
+        assertEq(uint8(policies.classify(_ops(_clause(Ex, 0, P, 0, PolicyRegistry.Polarity.Neutral)))), uint8(PolicyRegistry.Class.StateIndependent));
+        // üres program → állapotfüggetlen
+        assertEq(uint8(policies.classify(_none())), uint8(PolicyRegistry.Class.StateIndependent));
+        // ∧ és ∨ join: stable ∧ co-stable → volatile, stable ∨ stable → stable
+        PolicyRegistry.Op[] memory mixed = new PolicyRegistry.Op[](3);
+        mixed[0] = _clause(Ex, 0, P, 0, Up);
+        mixed[1] = _clause(Ex, 0, P, 0, Down);
+        mixed[2] = _connective(PolicyRegistry.OpKind.And);
+        assertEq(uint8(policies.classify(mixed)), uint8(PolicyRegistry.Class.Volatile));
+        mixed[1] = _clause(Ex, 0, P, 0, Up);
+        mixed[2] = _connective(PolicyRegistry.OpKind.Or);
+        assertEq(uint8(policies.classify(mixed)), uint8(PolicyRegistry.Class.Stable));
+
+        // a regisztrált policy a kiszámolt osztályt tárolja, deklaráció nélkül
+        PolicyRegistry.Binding[] memory b = _bind("R", PolicyRegistry.BindingKind.Registry, regId);
+        bytes32 p = _policy("exists x in Presented. NotRevoked(x) & atmost 1 y in Issued. NotRevoked(y)",
+            b, _ops(_clause(Ex, 0, P, 0, Down)), _ops(_clause(AtMost, 1, Iss, 0, Down)));
+        assertEq(uint8(policies.presentedClass(p)), uint8(PolicyRegistry.Class.CoStable));
+        assertEq(uint8(policies.publicClass(p)), uint8(PolicyRegistry.Class.Volatile));
+    }
+
+    function test_registerPolicyRejectsMalformed() public {
+        PolicyRegistry.Binding[] memory g = _bind("S", PolicyRegistry.BindingKind.Group, bytes32(uint256(1)));
+        PolicyRegistry.Binding[] memory reg = _bind("R", PolicyRegistry.BindingKind.Registry, regId);
+        PolicyRegistry.Op memory ok = _clause(PolicyRegistry.Quant.All, 0, PolicyRegistry.Domain.Group, 0, PolicyRegistry.Polarity.Down);
+
+        vm.expectRevert(PolicyRegistry.EmptyQuery.selector);
+        policies.registerPolicy("", g, _none(), _ops(ok));
+
+        PolicyRegistry.Binding[] memory dup = new PolicyRegistry.Binding[](2);
+        dup[0] = g[0];
+        dup[1] = g[0];
+        vm.expectRevert(abi.encodeWithSelector(PolicyRegistry.DuplicateBindingName.selector, 1));
+        policies.registerPolicy("q", dup, _none(), _ops(ok));
+
+        PolicyRegistry.Op[] memory long = new PolicyRegistry.Op[](33);
+        vm.expectRevert(abi.encodeWithSelector(PolicyRegistry.ProgramTooLong.selector, 33));
+        policies.registerPolicy("q", g, _none(), long);
+
+        PolicyRegistry.Op[] memory lonely = new PolicyRegistry.Op[](2);
+        lonely[0] = ok;
+        lonely[1] = _connective(PolicyRegistry.OpKind.And);
+        vm.expectRevert(PolicyRegistry.MalformedProgram.selector);
+        policies.registerPolicy("q", g, _none(), lonely);
+
+        PolicyRegistry.Op[] memory two = new PolicyRegistry.Op[](2);
+        two[0] = ok;
+        two[1] = ok;
+        vm.expectRevert(PolicyRegistry.MalformedProgram.selector);
+        policies.registerPolicy("q", g, _none(), two);
+
+        PolicyRegistry.Op memory badIdx = ok;
+        badIdx.binding = 1;
+        vm.expectRevert(abi.encodeWithSelector(PolicyRegistry.BadBinding.selector, 0));
+        policies.registerPolicy("q", g, _none(), _ops(badIdx));
+
+        vm.expectRevert(abi.encodeWithSelector(PolicyRegistry.DomainBindingMismatch.selector, 0));
+        policies.registerPolicy("q", reg, _none(), _ops(ok));
+
+        // presented program: csak Presented, csak ∃ és atleast, ∃-nél k = 0
+        vm.expectRevert(abi.encodeWithSelector(PolicyRegistry.BadPresentedClause.selector, 0));
+        policies.registerPolicy("q", g, _ops(ok), _none());
+        vm.expectRevert(abi.encodeWithSelector(PolicyRegistry.BadPresentedClause.selector, 0));
+        policies.registerPolicy("q", reg, _ops(_clause(PolicyRegistry.Quant.All, 0, PolicyRegistry.Domain.Presented, 0, PolicyRegistry.Polarity.Down)), _none());
+        vm.expectRevert(abi.encodeWithSelector(PolicyRegistry.BadPresentedClause.selector, 0));
+        policies.registerPolicy("q", reg, _ops(_clause(PolicyRegistry.Quant.Exists, 3, PolicyRegistry.Domain.Presented, 0, PolicyRegistry.Polarity.Down)), _none());
+
+        // public program: nem Presented, a törzs Up vagy Down, ∀-nél k = 0
+        vm.expectRevert(abi.encodeWithSelector(PolicyRegistry.BadPublicClause.selector, 0));
+        policies.registerPolicy("q", reg, _none(), _ops(_clause(PolicyRegistry.Quant.Exists, 0, PolicyRegistry.Domain.Presented, 0, PolicyRegistry.Polarity.Down)));
+        vm.expectRevert(abi.encodeWithSelector(PolicyRegistry.BadPublicClause.selector, 0));
+        policies.registerPolicy("q", g, _none(), _ops(_clause(PolicyRegistry.Quant.All, 0, PolicyRegistry.Domain.Group, 0, PolicyRegistry.Polarity.Mixed)));
+        vm.expectRevert(abi.encodeWithSelector(PolicyRegistry.BadPublicClause.selector, 0));
+        policies.registerPolicy("q", g, _none(), _ops(_clause(PolicyRegistry.Quant.All, 2, PolicyRegistry.Domain.Group, 0, PolicyRegistry.Polarity.Down)));
+    }
+
+    function test_policyIdCoversPrograms() public {
+        PolicyRegistry.Binding[] memory g = _bind("S", PolicyRegistry.BindingKind.Group, bytes32(uint256(1)));
+        PolicyRegistry.Op memory down = _clause(PolicyRegistry.Quant.All, 0, PolicyRegistry.Domain.Group, 0, PolicyRegistry.Polarity.Down);
+        PolicyRegistry.Op memory up = _clause(PolicyRegistry.Quant.All, 0, PolicyRegistry.Domain.Group, 0, PolicyRegistry.Polarity.Up);
+        bytes32 a = _policy("q", g, _none(), _ops(down));
+        bytes32 b = _policy("q", g, _none(), _ops(up));
+        assertTrue(a != b);
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(PolicyRegistry.PolicyExists.selector, a));
+        policies.registerPolicy("q", g, _none(), _ops(down));
     }
 
     function test_bindPolicyOnlyIssuer() public {
-        bytes32 p = _groupPolicy(bytes32(0), PolicyRegistry.Class.Stable, PolicyRegistry.CasMode.None);
+        bytes32 p = _reservationPolicy(bytes32(0));
         vm.prank(bob);
         vm.expectRevert(abi.encodeWithSelector(PolicyRegistry.NotIssuer.selector, credDefId, bob));
         policies.bindPolicy(credDefId, PolicyRegistry.Action.Revoke, p);
     }
 
-    /// a lakásfoglalás: Alice és Bob ugyanarra a csoportverzióra köti a guardot, csak az első megy át
-    function test_flatReservationCas() public {
-        _issue(Y1);
-        _issue(Y2);
-        _issue(Y3);
-        bytes32 g = _createGroup(LABEL, _members(Y1, Y2));
-        bytes32 p = _groupPolicy(g, PolicyRegistry.Class.CoStable, PolicyRegistry.CasMode.Group);
-        vm.prank(alice);
-        policies.bindPolicy(credDefId, PolicyRegistry.Action.Revoke, p);
-
-        // kötött policy mellett a nem őrzött visszavonás tilos
-        (bytes memory a, bytes memory r, bytes memory w) = _revokeValues(Y3);
-        vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(StateRegistry.PolicyRequired.selector, p));
-        registry.revoke(regId, bytes32(Y3), a, r, w);
-
-        uint64 gv = registry.groupVersion(g);
-        // Alice foglal
-        (a, r, w) = _revokeValues(Y1);
-        vm.prank(alice);
-        registry.guardedRevoke(regId, bytes32(Y1), a, r, w, _guard(p, gv));
-        curA = a; curR = r; curW = w;
-        // Bob ugyanarra a verzióra kötött guarddal: elutasítva
-        (a, r, w) = _revokeValues(Y2);
-        vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(StateRegistry.StaleGroupVersion.selector, g, gv, gv + 1));
-        registry.guardedRevoke(regId, bytes32(Y2), a, r, w, _guard(p, gv));
-    }
-
-    function test_groupCasIgnoresOutsideRevocation() public {
-        _issue(Y1);
-        _issue(Y2);
-        _issue(Y3);
-        bytes32 g = _createGroup(LABEL, _members(Y1, Y2));
-        bytes32 p = _groupPolicy(g, PolicyRegistry.Class.CoStable, PolicyRegistry.CasMode.Group);
-        uint64 gv = registry.groupVersion(g);
-        _revoke(Y3); // a csoporton kívül
-        (bytes memory a, bytes memory r, bytes memory w) = _revokeValues(Y1);
-        vm.prank(alice);
-        registry.guardedRevoke(regId, bytes32(Y1), a, r, w, _guard(p, gv));
-    }
-
-    function test_globalCasRejectsAnyUpdate() public {
+    /// kiadási szabály: kiadás csak akkor, ha a csoportban már valakit visszavontak; a contract kiértékeli
+    function test_publicGuardEvaluatedOnChain() public {
         _issue(Y1);
         _issue(Y2);
         bytes32 g = _createGroup(LABEL, _members(Y1, Y2));
-        bytes32 p = _groupPolicy(g, PolicyRegistry.Class.Volatile, PolicyRegistry.CasMode.Global);
-        (,,,, uint64 v) = registry.getValues(regId);
-        _issue(Y3);
-        (bytes memory a, bytes memory r, bytes memory w) = _revokeValues(Y1);
-        vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(StateRegistry.StaleVersion.selector, 0, v, v + 1));
-        registry.guardedRevoke(regId, bytes32(Y1), a, r, w, _guard(p, v));
-    }
+        bytes32 p = _policy(
+            "exists x in M. Revoked(x)",
+            _bind("M", PolicyRegistry.BindingKind.Group, g),
+            _none(),
+            _ops(_clause(PolicyRegistry.Quant.Exists, 0, PolicyRegistry.Domain.Group, 0, PolicyRegistry.Polarity.Up))
+        );
+        _bindTo(PolicyRegistry.Action.Issue, p);
 
-    function test_stableGuardNeedsNoComparison() public {
-        _issue(Y1);
-        _issue(Y2);
-        bytes32 g = _createGroup(LABEL, _members(Y1, Y2));
-        bytes32 p = _groupPolicy(g, PolicyRegistry.Class.Stable, PolicyRegistry.CasMode.None);
+        (bytes memory i, bytes memory w) = _issueValues(Y3);
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(StateRegistry.GuardFalse.selector, p));
+        registry.guardedIssueUpdate(regId, bytes32(Y3), i, w, _guard(p, 0));
+
         _revoke(Y1);
+        (i, w) = _issueValues(Y3);
+        vm.prank(alice);
+        registry.guardedIssueUpdate(regId, bytes32(Y3), i, w, _guard(p, 0));
+    }
+
+    /// a lakásfoglalás: Alice és Bob ugyanarra az állapotra készül; az első foglalás után a guard hamis
+    function test_flatReservationRaceDecidedOnChain() public {
+        _issue(Y1);
+        _issue(Y2);
+        _issue(Y3);
+        bytes32 g = _createGroup(LABEL, _members(Y1, Y2));
+        bytes32 p = _reservationPolicy(g);
+        _bindTo(PolicyRegistry.Action.Revoke, p);
+        uint64 gv = registry.groupVersion(g);
+
+        _guardedRevoke(Y1, _guard(p, gv)); // Alice foglal
+        _expectGuardedRevokeReverts(Y2, _guard(p, gv), abi.encodeWithSelector(StateRegistry.GuardFalse.selector, p));
+    }
+
+    /// az egyetlen író, a kibocsátó sem foglalhatja le kétszer a lakást: egyik út sem vezet át
+    function test_issuerCannotReserveTwice() public {
+        _issue(Y1);
+        _issue(Y2);
+        bytes32 g = _createGroup(LABEL, _members(Y1, Y2));
+        bytes32 p = _reservationPolicy(g);
+        _bindTo(PolicyRegistry.Action.Revoke, p);
+        _guardedRevoke(Y1, _guard(p, 0));
+
         (bytes memory a, bytes memory r, bytes memory w) = _revokeValues(Y2);
         vm.prank(alice);
-        registry.guardedRevoke(regId, bytes32(Y2), a, r, w, _guard(p, 12345));
+        vm.expectRevert(abi.encodeWithSelector(StateRegistry.PolicyRequired.selector, p));
+        registry.revoke(regId, bytes32(Y2), a, r, w);
+
+        bytes32 lax = _policy(
+            "exists x in S. Revoked(x)",
+            _bind("S", PolicyRegistry.BindingKind.Group, g),
+            _none(),
+            _ops(_clause(PolicyRegistry.Quant.Exists, 0, PolicyRegistry.Domain.Group, 0, PolicyRegistry.Polarity.Up))
+        );
+        _expectGuardedRevokeReverts(Y2, _guard(lax, 0), abi.encodeWithSelector(StateRegistry.WrongPolicy.selector, p, lax));
+        for (uint64 v = 0; v < 4; v++) {
+            _expectGuardedRevokeReverts(Y2, _guard(p, v), abi.encodeWithSelector(StateRegistry.GuardFalse.selector, p));
+        }
+    }
+
+    /// "mind visszavonva a bemutatott kivételével": a nyilvános rész számlálókkal, a bemutatott rész CAS-szal
+    function test_allButPresentedUsesCounters() public {
+        _issue(Y1);
+        _issue(Y2);
+        _issue(Y3);
+        PolicyRegistry.Binding[] memory b = _bind("R", PolicyRegistry.BindingKind.Registry, regId);
+        bytes32 p = _policy(
+            "exists x in Presented. NotRevoked(x) & atmost 1 y in Issued. NotRevoked(y)",
+            b,
+            _ops(_clause(PolicyRegistry.Quant.Exists, 0, PolicyRegistry.Domain.Presented, 0, PolicyRegistry.Polarity.Down)),
+            _ops(_clause(PolicyRegistry.Quant.AtMost, 1, PolicyRegistry.Domain.Issued, 0, PolicyRegistry.Polarity.Down))
+        );
+        _bindTo(PolicyRegistry.Action.Issue, p);
+
+        (,,,, uint64 v) = registry.getValues(regId);
+        (bytes memory i, bytes memory w) = _issueValues(Y4);
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(StateRegistry.GuardFalse.selector, p)); // három aktív
+        registry.guardedIssueUpdate(regId, bytes32(Y4), i, w, _guard(p, v));
+
+        _revoke(Y1);
+        _revoke(Y2);
+        (,,,, v) = registry.getValues(regId);
+        (i, w) = _issueValues(Y4);
+        vm.prank(alice);
+        registry.guardedIssueUpdate(regId, bytes32(Y4), i, w, _guard(p, v));
+    }
+
+    function test_presentedCoStableNeedsVersion() public {
+        _issue(Y1);
+        _issue(Y2);
+        bytes32 p = _policy(
+            "exists x in Presented. NotRevoked(x)",
+            _bind("R", PolicyRegistry.BindingKind.Registry, regId),
+            _ops(_clause(PolicyRegistry.Quant.Exists, 0, PolicyRegistry.Domain.Presented, 0, PolicyRegistry.Polarity.Down)),
+            _none()
+        );
+        (,,,, uint64 v) = registry.getValues(regId);
+        _issue(Y3); // a bizonyítás óta változott az állapot
+        _expectGuardedRevokeReverts(Y1, _guard(p, v), abi.encodeWithSelector(StateRegistry.StaleVersion.selector, 0, v, v + 1));
+        _guardedRevoke(Y1, _guard(p, v + 1));
+    }
+
+    /// a bérlet: kiadás a második registryben, ha a bemutatott érdeklődési credential vissza van vonva (stable)
+    function test_presentedStableNeedsNoVersion() public {
+        string[] memory attributes = new string[](1);
+        attributes[0] = "flat";
+        bytes32 leaseSchema = schemaRegistry.registerSchema("Lease", "1.0", true, attributes);
+        vm.prank(alice);
+        bytes32 leaseDef = credDefRegistry.registerCredDef(alice, leaseSchema, "default", keccak256("alice#bbs-key-2"));
+        (bytes memory v0, bytes memory qt, bytes memory q) = _keys(ALPHA);
+        vm.prank(alice);
+        bytes32 leaseReg = registry.createRegistry(leaseDef, keccak256("lease"), v0, qt, q);
+        (bytes[] memory p1, bytes[] memory p2) = _srs(SRS_DEGREE);
+        vm.prank(alice);
+        registry.publishSrs(leaseReg, p1, p2);
+
+        bytes32 p = _policy(
+            "exists x in Presented. Revoked(x)",
+            _bind("Interest", PolicyRegistry.BindingKind.Registry, regId),
+            _ops(_clause(PolicyRegistry.Quant.Exists, 0, PolicyRegistry.Domain.Presented, 0, PolicyRegistry.Polarity.Up)),
+            _none()
+        );
+        vm.prank(alice);
+        policies.bindPolicy(leaseDef, PolicyRegistry.Action.Issue, p);
+
+        _issue(Y1);
+        _revoke(Y1);
+        _issue(Y2); // a bizonyítás óta változott az érdeklődési registry: stable guardnál mindegy
+        bytes memory i = BLS.g1Mul(BLS.g1(), addmod(Y1, ALPHA, BLS.R));
+        vm.prank(alice);
+        registry.guardedIssueUpdate(leaseReg, bytes32(Y1), i, i, _guard(p, 12345));
+    }
+
+    function test_groupGuardIgnoresOutsideRevocation() public {
+        _issue(Y1);
+        _issue(Y2);
+        _issue(Y3);
+        bytes32 g = _createGroup(LABEL, _members(Y1, Y2));
+        bytes32 p = _reservationPolicy(g);
+        _revoke(Y3); // a csoporton kívül
+        _guardedRevoke(Y1, _guard(p, 0));
     }
 
     function test_wrongPolicyReverts() public {
         _issue(Y1);
         _issue(Y2);
         bytes32 g = _createGroup(LABEL, _members(Y1, Y2));
-        bytes32 p = _groupPolicy(g, PolicyRegistry.Class.CoStable, PolicyRegistry.CasMode.Group);
-        bytes32 other = _groupPolicy(g, PolicyRegistry.Class.Stable, PolicyRegistry.CasMode.None);
-        vm.prank(alice);
-        policies.bindPolicy(credDefId, PolicyRegistry.Action.Revoke, p);
-        (bytes memory a, bytes memory r, bytes memory w) = _revokeValues(Y1);
-        vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(StateRegistry.WrongPolicy.selector, p, other));
-        registry.guardedRevoke(regId, bytes32(Y1), a, r, w, _guard(other, 0));
+        bytes32 p = _reservationPolicy(g);
+        bytes32 other = _policy(
+            "exists x in S. Revoked(x)",
+            _bind("S", PolicyRegistry.BindingKind.Group, g),
+            _none(),
+            _ops(_clause(PolicyRegistry.Quant.Exists, 0, PolicyRegistry.Domain.Group, 0, PolicyRegistry.Polarity.Up))
+        );
+        _bindTo(PolicyRegistry.Action.Revoke, p);
+        _expectGuardedRevokeReverts(Y1, _guard(other, 0), abi.encodeWithSelector(StateRegistry.WrongPolicy.selector, p, other));
     }
 
-    /// kiadási szabály: kiadás csak akkor, ha a csoportban már valakit visszavontak (stable guard)
-    function test_guardedIssueAcrossRegistries() public {
+    function test_unguardedUpdateRejectedWhenBound() public {
         _issue(Y1);
         _issue(Y2);
         bytes32 g = _createGroup(LABEL, _members(Y1, Y2));
-        PolicyRegistry.Binding[] memory b = new PolicyRegistry.Binding[](1);
-        b[0] = PolicyRegistry.Binding({name: "M", kind: PolicyRegistry.BindingKind.Group, target: g});
-        vm.prank(alice);
-        bytes32 p = policies.registerPolicy("exists x in M. Revoked(x)", PolicyRegistry.Class.Stable, PolicyRegistry.CasMode.None, b);
-        vm.prank(alice);
-        policies.bindPolicy(credDefId, PolicyRegistry.Action.Issue, p);
-
-        (bytes memory i, bytes memory w) = _issueValues(Y3);
+        bytes32 p = _reservationPolicy(g);
+        _bindTo(PolicyRegistry.Action.Revoke, p);
+        _bindTo(PolicyRegistry.Action.Issue, p);
+        (bytes memory a, bytes memory r, bytes memory w) = _revokeValues(Y1);
         vm.prank(alice);
         vm.expectRevert(abi.encodeWithSelector(StateRegistry.PolicyRequired.selector, p));
-        registry.issueUpdate(regId, bytes32(Y3), i, w);
+        registry.revoke(regId, bytes32(Y1), a, r, w);
+        (bytes memory i, bytes memory iw) = _issueValues(Y3);
         vm.prank(alice);
-        registry.guardedIssueUpdate(regId, bytes32(Y3), i, w, _guard(p, 0));
+        vm.expectRevert(abi.encodeWithSelector(StateRegistry.PolicyRequired.selector, p));
+        registry.issueUpdate(regId, bytes32(Y3), i, iw);
+    }
+
+    /// minden kvantor és polaritás egy referencia-számlálással szemben, csoporton és Issued-on
+    function testFuzz_publicClauseMatchesCount(uint8 quantSeed, bool up, uint8 kSeed, uint8 revokedSeed, bool overIssued)
+        public
+    {
+        PolicyRegistry.Quant quant = PolicyRegistry.Quant(quantSeed % 4);
+        bool trivial = quant == PolicyRegistry.Quant.All || quant == PolicyRegistry.Quant.Exists;
+        uint32 k = trivial ? 0 : uint32(kSeed % 5);
+        uint256 revoked = revokedSeed % 4;
+
+        _issue(Y1);
+        _issue(Y2);
+        _issue(Y3);
+        _issue(Y4);
+        bytes32[] memory m = new bytes32[](3);
+        m[0] = bytes32(Y1);
+        m[1] = bytes32(Y2);
+        m[2] = bytes32(Y3);
+        bytes32 g = _createGroup(LABEL, m);
+        if (revoked > 0) _revoke(Y1);
+        if (revoked > 1) _revoke(Y2);
+        if (revoked > 2) _revoke(Y3);
+
+        PolicyRegistry.Polarity body = up ? PolicyRegistry.Polarity.Up : PolicyRegistry.Polarity.Down;
+        PolicyRegistry.Binding[] memory b = overIssued
+            ? _bind("R", PolicyRegistry.BindingKind.Registry, regId)
+            : _bind("S", PolicyRegistry.BindingKind.Group, g);
+        PolicyRegistry.Domain d = overIssued ? PolicyRegistry.Domain.Issued : PolicyRegistry.Domain.Group;
+        bytes32 p = _policy("fuzz", b, _none(), _ops(_clause(quant, k, d, 0, body)));
+
+        uint256 n = overIssued ? 4 : 3;
+        uint256 cnt = up ? revoked : n - revoked;
+        bool expected = quant == PolicyRegistry.Quant.All ? cnt == n
+            : quant == PolicyRegistry.Quant.Exists ? cnt >= 1
+            : quant == PolicyRegistry.Quant.AtLeast ? cnt >= k
+            : cnt <= k;
+
+        // Y4 a csoporton kívül van; a guard a visszavonása előtti állapotra vonatkozik
+        if (expected) {
+            _guardedRevoke(Y4, _guard(p, 0));
+        } else {
+            _expectGuardedRevokeReverts(Y4, _guard(p, 0), abi.encodeWithSelector(StateRegistry.GuardFalse.selector, p));
+        }
     }
 
     function testFuzz_nonIssuerCannotRevoke(address caller) public {
