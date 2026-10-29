@@ -483,7 +483,7 @@ contract StateRegistryTest is Test {
         g.policyId = policyId;
         g.expectedVersions = new uint64[](1);
         g.expectedVersions[0] = v;
-        g.proofHash = keccak256("proof");
+        g.proof = bytes("proof");
     }
 
     function _bindTo(PolicyRegistry.Action action, bytes32 p) internal {
@@ -809,6 +809,37 @@ contract StateRegistryTest is Test {
         vm.prank(alice);
         vm.expectRevert(abi.encodeWithSelector(StateRegistry.PolicyRequired.selector, p));
         registry.issueUpdate(regId, bytes32(Y3), i, iw);
+    }
+
+    /// a guard bizonyítása láncra kerül: bárki utólag ellenőrizheti
+    function test_guardProofEmitted() public {
+        _issue(Y1);
+        _issue(Y2);
+        bytes32 g = _createGroup(LABEL, _members(Y1, Y2));
+        bytes32 p = _reservationPolicy(g);
+        StateRegistry.Guard memory gd = _guard(p, 0);
+        gd.proof = hex"c0ffee0102";
+        (,,,, uint64 v) = registry.getValues(regId);
+        vm.expectEmit(true, true, true, true);
+        emit StateRegistry.GuardProof(regId, v + 1, p, hex"c0ffee0102");
+        _guardedRevoke(Y1, gd);
+    }
+
+    function test_guardDigestBindsProof() public {
+        _issue(Y1);
+        _issue(Y2);
+        _issue(Y3);
+        bytes32 g = _createGroup(LABEL, _members(Y1, Y2));
+        bytes32 p = _reservationPolicy(g);
+        StateRegistry.Guard memory gd = _guard(p, 0);
+        gd.proof = hex"01";
+        (bytes memory a, bytes memory r, bytes memory w) = _revokeValues(Y3);
+        (,,,, uint64 v) = registry.getValues(regId);
+        bytes32 digest = keccak256(abi.encode(p, keccak256(hex"01")));
+        assertTrue(digest != keccak256(abi.encode(p, keccak256(hex"02"))));
+        vm.expectEmit(true, true, true, true);
+        emit StateRegistry.Revoked(regId, v + 1, bytes32(Y3), a, r, w, digest);
+        _guardedRevoke(Y3, gd);
     }
 
     /// minden kvantor és polaritás egy referencia-számlálással szemben, csoporton és Issued-on
