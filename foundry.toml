@@ -10,8 +10,8 @@ via_ir = false
 remappings = ["ethr-did-registry/=lib/ethr-did-registry/contracts/"]
 
 [rpc_endpoints]
-scroll_sepolia = "https://sepolia-rpc.scroll.io"
+local = "http://127.0.0.1:8545"
+op_sepolia = "https://sepolia.optimism.io"
 
 [etherscan]
-scroll_sepolia = { key = "${SCROLLSCAN_API_KEY}", url = "https://api-sepolia.scrollscan.com/api", chain = 534351 }
-
+op_sepolia = { key = "${ETHERSCAN_API_KEY}", chain = 11155420 }

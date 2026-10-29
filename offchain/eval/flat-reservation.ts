@@ -30,9 +30,9 @@ export interface FlatResult {
 }
 
 export async function runFlatReservation(rpc = RPC): Promise<FlatResult> {
-  const provider = new ethers.JsonRpcProvider(rpc);
+  const provider = new ethers.JsonRpcProvider(rpc, undefined, { pollingInterval: 50, cacheTimeout: -1 });
   const landlordKey = new ethers.Wallet(KEYS[0]!, provider);
-  const signer = new ethers.NonceManager(landlordKey);
+  const signer = landlordKey; // every transaction is awaited, so the provider's nonce is always current
   const log: string[] = [];
   const gas: Record<string, bigint> = {};
   const say = (s: string) => { log.push(s); console.log(s); };
