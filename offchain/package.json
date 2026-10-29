@@ -12,7 +12,8 @@
     "eval:bench": "node eval/bench.ts",
     "demo": "node eval/flat-reservation.ts",
     "eval:gas": "node eval/gas.ts",
-    "eval:report": "node eval/report.ts"
+    "eval:report": "node eval/report.ts",
+    "demo:op-sepolia": "node eval/op-sepolia.ts"
   },
   "dependencies": {
     "@digitalbazaar/bbs-signatures": "^3.1.0",

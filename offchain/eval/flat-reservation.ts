@@ -10,8 +10,9 @@
 //     (Alice proves she holds the reservation without saying which member she is).
 //
 // Usage: anvil --hardfork prague &   then   node eval/flat-reservation.ts [rpc]
+// On a public chain: eval/op-sepolia.ts (existing contracts, a funded key, labels made unique per run).
 import { ethers } from 'ethers';
-import { deployAll } from '../src/chain/client.ts';
+import { deployAll, type Deployment } from '../src/chain/client.ts';
 import { Issuer, Holder, Verifier, readGroup, type PolicyRef } from '../src/actors/actors.ts';
 import type { Binding } from '../src/ql/compile.ts';
 
@@ -29,27 +30,37 @@ export interface FlatResult {
   log: string[];
 }
 
-export async function runFlatReservation(rpc = RPC): Promise<FlatResult> {
-  const provider = new ethers.JsonRpcProvider(rpc, undefined, { pollingInterval: 50, cacheTimeout: -1 });
-  const landlordKey = new ethers.Wallet(KEYS[0]!, provider);
-  const signer = landlordKey; // every transaction is awaited, so the provider's nonce is always current
+export interface FlatOptions {
+  /** the landlord's signer; default: anvil's first account on `rpc` */
+  signer?: ethers.Signer;
+  /** contracts already on chain; default: deploy a fresh set */
+  deployment?: Deployment;
+  /** appended to schema, registry and group labels, so a run on a shared chain does not collide */
+  tag?: string;
+}
+
+export async function runFlatReservation(rpc = RPC, opts: FlatOptions = {}): Promise<FlatResult> {
+  // every transaction is awaited, so the provider's nonce is always current
+  const signer = opts.signer
+    ?? new ethers.Wallet(KEYS[0]!, new ethers.JsonRpcProvider(rpc, undefined, { pollingInterval: 50, cacheTimeout: -1 }));
+  const tag = opts.tag ?? '';
   const log: string[] = [];
   const gas: Record<string, bigint> = {};
   const say = (s: string) => { log.push(s); console.log(s); };
 
-  const d = await deployAll(signer);
-  say(`deployed StateRegistry at ${await d.state.getAddress()}`);
+  const d = opts.deployment ?? await deployAll(signer);
+  say(`${opts.deployment ? 'using' : 'deployed'} StateRegistry at ${await d.state.getAddress()}`);
   const landlord = new Issuer(signer, d);
-  await landlord.setUp('Interest', ['flat', 'name']);
+  await landlord.setUp(`Interest${tag}`, ['flat', 'name']);
 
   const scenario = async (label: string, bound: boolean) => {
-    const reg = await landlord.createRegistry(`flat-${label}`, 8);
+    const reg = await landlord.createRegistry(`flat-${label}${tag}`, 8);
     const alice = new Holder(d), bob = new Holder(d), carol = new Holder(d);
     for (const [h, n] of [[alice, 'Alice'], [bob, 'Bob'], [carol, 'Carol']] as const) {
       h.wallet.push(await landlord.issue(reg, [`flat-${label}`, n], h.linkSecret));
     }
     const ys = [alice, bob, carol].map((h) => h.wallet[0]!.scalars[0]!);
-    const groupId = await landlord.createGroup(reg, `interested-${label}`, ys);
+    const groupId = await landlord.createGroup(reg, `interested-${label}${tag}`, ys);
     const S = await readGroup(d, groupId);
     const bindings: [string, Binding][] = [['S', S], ['Landlord', { kind: 'creddef', credDefId: landlord.credDefId }]];
     const guardQuery = 'forall x in S. NotRevoked(x)';

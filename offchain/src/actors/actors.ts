@@ -4,7 +4,7 @@ import { ethers } from 'ethers';
 import * as acc from '../crypto/accumulator.ts';
 import * as bbs from '../crypto/bbs.ts';
 import { g1ToEip, g2ToEip, mod, randomScalar, utf8ToBytes, scalarToHex32, type G1Point } from '../crypto/bls.ts';
-import { type Deployment, publishBbsKey, readHistory, pubToEip, srsToEip } from '../chain/client.ts';
+import { type Deployment, type ContractName, publishBbsKey, readHistory, pubToEip, srsToEip } from '../chain/client.ts';
 import { parse } from '../ql/parser.ts';
 import {
   present, verifyPresentation, analyse, type PublicContext, type WalletCredential, type Presentation, type Binding,
@@ -45,7 +45,7 @@ export class Issuer {
 
   constructor(signer: ethers.Signer, d: Deployment) { this.signer = signer; this.d = d; }
 
-  private c(name: keyof Deployment): ethers.Contract { return this.d[name].connect(this.signer) as ethers.Contract; }
+  private c(name: ContractName): ethers.Contract { return this.d[name].connect(this.signer) as ethers.Contract; }
 
   async setUp(schemaName: string, attributes: string[]): Promise<void> {
     this.kp = await bbs.generateKeyPair();

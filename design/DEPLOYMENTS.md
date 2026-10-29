@@ -21,3 +21,6 @@ in forge's local EVM, so it alone does not show that the chain has the precompil
 
 Explorer: `https://sepolia-optimism.etherscan.io/address/<address>`. The contracts are not source-verified
 (that needs `ETHERSCAN_API_KEY`: `forge verify-contract ... --chain 11155420`).
+
+The flat reservation was run against these contracts: [`OP-SEPOLIA-RUN.md`](OP-SEPOLIA-RUN.md) (outcome, gas and
+fees per operation, every transaction). Addresses for the off-chain client: `deployments/11155420.json`.

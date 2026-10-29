@@ -1,0 +1,14 @@
+{
+  "chain": "op-sepolia",
+  "chainId": 11155420,
+  "rpc": "https://sepolia.optimism.io",
+  "explorer": "https://sepolia-optimism.etherscan.io",
+  "fromBlock": 50735934,
+  "contracts": {
+    "did": "0xe18dAa42ff516Ad981d10f1b3E256E181E67a2A5",
+    "schemas": "0x0d56767A51cB0c5C4Be03D81c03e5cFD295F6A97",
+    "credDefs": "0x55132dd145d17c29D7bC2FCF9f837a0604526363",
+    "policies": "0xBD9c6664f467135bcF1ca49e17fd786Bc8623055",
+    "state": "0x3947002b50fC6da0E785Cf0D67E15355Cf4D47B5"
+  }
+}
