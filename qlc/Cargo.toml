@@ -1,0 +1,18 @@
+[package]
+name = "qlc"
+version = "0.1.0"
+edition = "2021"
+description = "Front end of the credential query language compiler: parser, negation normal form, classification and proof plan."
+license = "MIT OR Apache-2.0"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
