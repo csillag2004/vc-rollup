@@ -29,7 +29,8 @@ npm run demo                      # flat reservation end to end
 npm run eval:report               # regenerates design/EVALUATION.md
 ```
 
-Deploying to OP Sepolia (the script first checks that the chain has the BLS12-381 pairing precompile):
+Deployed on OP Sepolia: addresses in [`design/DEPLOYMENTS.md`](design/DEPLOYMENTS.md). To deploy again (the script
+first probes the BLS12-381 pairing precompile):
 
 ```shell
 forge script script/Deploy.s.sol --rpc-url op_sepolia --private-key $PRIVATE_KEY --broadcast
