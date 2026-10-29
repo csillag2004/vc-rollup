@@ -12,7 +12,7 @@ function registry() {
   const ys = [1n, 2n, 3n].map(() => randomScalar());
   const rec: Record<string, any> = {};
   for (const y of ys) {
-    const st = acc.issueStep(secret, v, y, () => 7n);
+    const st = acc.issueStep(secret, v, y);
     rec[y.toString()] = { A: st.receiptA, I: st.receiptI };
     v = { ...v, I: st.newI, WIR: st.newWIR };
   }
@@ -63,7 +63,7 @@ test('BBS leaf linked to a NotRevoked leaf, and distinctness', async () => {
   // issue y into a fresh registry so the receipt matches
   const { secret, pub: pub2 } = acc.generateAccumulatorKeys();
   const iv = acc.initialValues(pub2);
-  const ist = acc.issueStep(secret, iv, y, () => 1n);
+  const ist = acc.issueStep(secret, iv, y);
   const msgs = [yMsg, utf8ToBytes('Alice')];
   const sig = await bbs.sign(kp, header, msgs);
   const scalars = msgs.map(bbs.messageToScalar);
@@ -94,7 +94,7 @@ test('aggregate receipt from individual receipts equals the trapdoor one (|S| = 
   for (let n = 2; n <= 5; n++) {
     const members = Array.from({ length: n }, () => randomScalar());
     const A = pub.V0;
-    const receipts = members.map((y) => mul(A, 1n) && acc.issueStep(secret, acc.initialValues(pub), y, () => 1n).receiptA);
+    const receipts = members.map((y) => mul(A, 1n) && acc.issueStep(secret, acc.initialValues(pub), y).receiptA);
     const W = acc.aggregateReceipt(members, receipts);
     assert.ok(W.equals(acc.aggregateReceiptWithTrapdoor(secret, A, members)), `n=${n}`);
     assert.ok(acc.verifyAggregate(A, W, members, srs));

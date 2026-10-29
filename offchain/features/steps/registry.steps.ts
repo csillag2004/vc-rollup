@@ -2,9 +2,8 @@
 import assert from 'node:assert/strict';
 import { Given, When, Then } from '@cucumber/cucumber';
 import { ethers } from 'ethers';
-import * as acc from '../../src/crypto/accumulator.ts';
 import { g1, g1ToEip, mul, randomScalar, scalarToHex32 } from '../../src/crypto/bls.ts';
-import { readHistory, srsToEip } from '../../src/chain/client.ts';
+import { readHistory } from '../../src/chain/client.ts';
 import { Holder, readGroup } from '../../src/actors/actors.ts';
 import type { ReservationWorld } from '../support/world.ts';
 
@@ -55,18 +54,11 @@ Given(/^the group (\w+) = \{(.+)\} is anchored on chain$/, async function (this:
   this.groups.set(group, await readGroup(this.d, groupId));
 });
 
-When(/^the landlord anchors the group \{(.+)\} with the witness of \{(.+)\}$/,
-  async function (this: ReservationWorld, list: string, witnessList: string) {
-    const sort = (xs: bigint[]) => [...xs].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
-    const members = sort(names(list).map((n) => this.y(n)));
-    const other = sort(names(witnessList).map((n) => this.y(n)));
-    const h = await readHistory(this.d, this.registryId);
-    const W = acc.groupSubsetWitness(this.landlord.secrets.get(this.registryId)!, h.values[h.values.length - 1]!.I, other);
-    const srs = srsToEip(this.landlord.local.get(this.registryId)!.srs);
-    const st = this.d.state.connect(this.landlord.signer) as ethers.Contract;
-    await this.attempt('createGroup', async () => (await st.createGroup!(
-      this.registryId, ethers.id(`${this.label}-wrong`), members.map(scalarToHex32), g1ToEip(W), srs.g2)).wait());
-  });
+When(/^the landlord anchors a group of (\w+) and an ID that was never issued$/, async function (this: ReservationWorld, name: string) {
+  // the issuer knows α, but the contract checks membership in its issued set, not with a pairing
+  await this.attempt('createGroup', () =>
+    this.landlord.createGroup(this.registryId, `${this.label}-unissued`, [this.y(name), randomScalar()]));
+});
 
 When(/^the landlord submits a revocation of (\w+) with a wrong new A$/, async function (this: ReservationWorld, name: string) {
   const h = await readHistory(this.d, this.registryId);

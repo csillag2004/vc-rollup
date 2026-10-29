@@ -3,21 +3,27 @@
 import { ethers } from 'ethers';
 import * as acc from '../crypto/accumulator.ts';
 import * as bbs from '../crypto/bbs.ts';
-import { g1ToEip, g2ToEip, mod, randomScalar, utf8ToBytes, scalarToHex32, type G1Point } from '../crypto/bls.ts';
-import { type Deployment, type ContractName, publishBbsKey, readHistory, pubToEip, srsToEip } from '../chain/client.ts';
+import { g1ToEip, g2ToEip, randomScalar, utf8ToBytes, scalarToHex32, type G1Point } from '../crypto/bls.ts';
+import {
+  type Deployment, type ContractName, publishBbsKey, readHistory, readGuardProof, pubToEip, srsToEip, encodeGuardProof,
+} from '../chain/client.ts';
 import { parse } from '../ql/parser.ts';
 import {
-  present, verifyPresentation, analyse, type PublicContext, type WalletCredential, type Presentation, type Binding,
+  present, verifyPresentation, type PublicContext, type WalletCredential, type Presentation, type Binding,
 } from '../ql/compile.ts';
+import {
+  compileGuard, chainBindings, presentedNeedsVersions, presentedBindings, BINDING_KIND, type GuardPrograms, type Op,
+} from '../ql/programs.ts';
 import { checkFreshness } from '../ql/freshness.ts';
-import { groupVersionAt, type RegistryHistory } from '../registry/history.ts';
+import type { RegistryHistory } from '../registry/history.ts';
 
-const CLASS_ID = { 'state-independent': 0, stable: 1, 'co-stable': 2, volatile: 3 } as const;
-const CAS_ID = { none: 0, group: 1, global: 2 } as const;
-const KIND_ID = { group: 0, registry: 1, creddef: 2 } as const;
 export const ACTION = { issue: 0, revoke: 1, present: 2 } as const;
 
-export interface PolicyRef { policyId: string; query: string; bindings: [string, Binding][] }
+/** a registered policy: the query text, its bindings and the two programs compiled from them */
+export interface PolicyRef { policyId: string; query: string; bindings: [string, Binding][]; programs: GuardPrograms }
+
+/** StateRegistry.Guard */
+export interface Guard { policyId: string; expectedVersions: bigint[]; proof: Uint8Array }
 
 /** public context for a query: histories of every registry it may touch, read from the ledger */
 export async function loadContext(d: Deployment, bindings: [string, Binding][], extraRegistries: string[] = []): Promise<PublicContext> {
@@ -33,6 +39,30 @@ export async function readGroup(d: Deployment, groupId: string): Promise<Binding
   return { kind: 'group', groupId, registryId, members: (members as string[]).map((m) => BigInt(m)) };
 }
 
+const OP_FIELDS = ['kind', 'quant', 'k', 'domain', 'binding', 'body'] as const;
+const sameOps = (a: Op[], b: ethers.Result[]): boolean =>
+  a.length === b.length && a.every((op, i) => OP_FIELDS.every((f) => BigInt(op[f]) === BigInt(b[i]![f])));
+
+/**
+ * A policy as the ledger has it. The contract evaluates the registered programs, a reader verifies the
+ * query text, so the programs must be the compilation of the text and the bindings.
+ */
+export async function readPolicy(d: Deployment, policyId: string): Promise<PolicyRef> {
+  const p = await d.policies.getPolicy!(policyId);
+  const bindings: [string, Binding][] = [];
+  for (const b of p.bindings as ethers.Result[]) {
+    const kind = Number(b.kind);
+    bindings.push([ethers.decodeBytes32String(b.name),
+      kind === BINDING_KIND.group ? await readGroup(d, b.target)
+        : kind === BINDING_KIND.registry ? { kind: 'registry', registryId: b.target } : { kind: 'creddef', credDefId: b.target }]);
+  }
+  const programs = compileGuard(parse(p.query), bindings);
+  if (!sameOps(programs.presented, p.presentedOps) || !sameOps(programs.public, p.publicOps)) {
+    throw new Error(`policy ${policyId}: the registered programs are not the compilation of its query`);
+  }
+  return { policyId, query: p.query, bindings, programs };
+}
+
 export class Issuer {
   readonly signer: ethers.Signer;
   readonly d: Deployment;
@@ -40,8 +70,6 @@ export class Issuer {
   credDefId = '';
   /** registryId -> accumulator secret */
   readonly secrets = new Map<string, acc.AccumulatorSecret>();
-  /** registryId -> pub keys and SRS kept locally */
-  readonly local = new Map<string, { pub: acc.PublicKeys; srs: acc.Srs }>();
 
   constructor(signer: ethers.Signer, d: Deployment) { this.signer = signer; this.d = d; }
 
@@ -84,11 +112,10 @@ export class Issuer {
     const s = srsToEip(srs);
     await (await st.publishSrs!(registryId, s.g1, s.g2)).wait();
     this.secrets.set(registryId, secret);
-    this.local.set(registryId, { pub, srs });
     return registryId;
   }
 
-  /** the holder sends its link secret; the issuer picks a fresh revocation ID and signs */
+  /** the holder sends its link secret; the issuer picks a fresh revocation ID, signs, and issues it in the clear */
   async issue(registryId: string, attributes: string[], linkSecret: bigint, guard?: { policy: PolicyRef; presentation: Presentation }):
     Promise<WalletCredential> {
     const h = await readHistory(this.d, registryId);
@@ -100,17 +127,12 @@ export class Issuer {
     const header = utf8ToBytes(this.credDefId);
     const sig = await bbs.sign(this.kp, header, msgs);
     const st = this.c('state');
-    const step = acc.issueStep(this.secrets.get(registryId)!, values, y, () => 0n);
-    // the Schnorr challenge is the contract's; recompute the response with it
-    const k = randomScalar();
-    const Rc = mulG1(values.I, k);
-    const c = BigInt(await st.issueChallenge!(registryId, g1ToEip(step.newI), g1ToEip(step.T), g1ToEip(Rc)));
-    const call = { newI: g1ToEip(step.newI), newWIR: g1ToEip(step.newWIR), T: g1ToEip(step.T), R: g1ToEip(Rc), z: mod(k + c * y) };
+    const step = acc.issueStep(this.secrets.get(registryId)!, values, y);
+    const args = [registryId, scalarToHex32(y), g1ToEip(step.newI), g1ToEip(step.newWIR)] as const;
     if (guard) {
-      const g = await this.guardFor(guard.policy, guard.presentation);
-      await (await st.guardedIssueUpdate!(registryId, call, g)).wait();
+      await (await st.guardedIssueUpdate!(...args, this.guardFor(guard.policy, guard.presentation))).wait();
     } else {
-      await (await st.issueUpdate!(registryId, call)).wait();
+      await (await st.issueUpdate!(...args)).wait();
     }
     const version = h.values.length; // the version this issuance created
     return {
@@ -129,67 +151,62 @@ export class Issuer {
     return (await this.c('state').revoke!(...this.revokeArgs(registryId, h, y))).wait();
   }
 
+  /** members must be issued (the contract checks each one in storage); anyone may create a group */
   async createGroup(registryId: string, label: string, members: bigint[]): Promise<string> {
     const sorted = [...members].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
-    const h = await readHistory(this.d, registryId);
-    const I = h.values[h.values.length - 1]!.I;
-    const W = acc.groupSubsetWitness(this.secrets.get(registryId)!, I, sorted);
-    const srs = srsToEip(this.local.get(registryId)!.srs);
     const st = this.c('state');
-    const args = [registryId, ethers.id(label), sorted.map(scalarToHex32), g1ToEip(W), srs.g2] as const;
+    const args = [registryId, ethers.id(label), sorted.map(scalarToHex32)] as const;
     const groupId: string = await st.createGroup!.staticCall(...args);
     await (await st.createGroup!(...args)).wait();
     return groupId;
   }
 
+  /** compiles the query into the presented and public programs; the contract classifies them */
   async registerPolicy(query: string, bindings: [string, Binding][], bindTo?: keyof typeof ACTION): Promise<PolicyRef> {
-    const an = analyse(parse(query));
-    const b = bindings.map(([name, x]) => ({
-      name: ethers.encodeBytes32String(name), kind: KIND_ID[x.kind],
-      target: x.kind === 'group' ? x.groupId : x.kind === 'registry' ? x.registryId : x.credDefId,
-    }));
+    const programs = compileGuard(parse(query), bindings);
     const pol = this.c('policies');
-    const args = [query, CLASS_ID[an.class], CAS_ID[an.cas], b] as const;
+    const args = [query, chainBindings(bindings), programs.presented, programs.public] as const;
     const policyId: string = await pol.registerPolicy!.staticCall(...args);
     await (await pol.registerPolicy!(...args)).wait();
     if (bindTo) await (await pol.bindPolicy!(this.credDefId, ACTION[bindTo], policyId)).wait();
-    return { policyId, query, bindings };
+    return { policyId, query, bindings, programs };
   }
 
-  /** expected versions in binding order: group versions (group CAS) or registry versions at the bound state */
-  async guardFor(policy: PolicyRef, p: Presentation) {
-    const an = analyse(parse(policy.query));
-    const ctx = await loadContext(this.d, policy.bindings, Object.keys(p.versions));
-    const expected = policy.bindings.map(([, b]) => {
-      if (b.kind === 'creddef') return 0n;
-      const h = ctx.registries.get(b.registryId)!;
-      const v = p.versions[b.registryId] ?? h.values.length - 1;
-      if (b.kind === 'group' && an.cas === 'group') return BigInt(groupVersionAt(h, b.members, v));
+  /**
+   * The guard for a presentation of the policy's query: the proof bytes, and in binding order the
+   * expected versions. The contract compares only the registries the presented clauses refer to, and
+   * only for a co-stable or volatile presented part; every other entry is 0.
+   */
+  guardFor(policy: PolicyRef, p: Presentation): Guard {
+    const compared = presentedNeedsVersions(policy.programs) ? presentedBindings(policy.programs) : new Set<number>();
+    const expectedVersions = policy.bindings.map(([name, b], i) => {
+      if (!compared.has(i) || b.kind !== 'registry') return 0n;
+      const v = p.versions[b.registryId];
+      if (v === undefined) throw new Error(`the presentation is not bound to a version of ${name}`);
       return BigInt(v);
     });
-    return { policyId: policy.policyId, expectedVersions: expected, proofHash: ethers.id(JSON.stringify(p)) };
+    return { policyId: policy.policyId, expectedVersions, proof: encodeGuardProof(p) };
   }
 
   /**
    * A guarded revocation on request: the requester sends its revocation ID and a presentation of the
    * policy's query. The issuer verifies it off-chain (verify on read for the guard) and submits the
-   * update with the versions the proof was bound to; the contract does the compare-and-swap.
+   * update with the proof; the contract evaluates the public part and compares versions for the
+   * presented part, and the proof lands on the ledger.
    */
   async guardedRevoke(registryId: string, y: bigint, policy: PolicyRef, p: Presentation): Promise<ethers.TransactionReceipt> {
+    if (p.query !== policy.query) throw new Error('guard proof rejected: it presents another query');
     const ctx = await loadContext(this.d, policy.bindings, Object.keys(p.versions));
     const v = verifyPresentation(parse(policy.query), p, ctx);
     if (!v.ok) throw new Error(`guard proof rejected: ${v.reason}`);
     const h = await readHistory(this.d, registryId);
-    const g = await this.guardFor(policy, p);
-    return (await this.c('state').guardedRevoke!(...this.revokeArgs(registryId, h, y), g)).wait();
+    return (await this.c('state').guardedRevoke!(...this.revokeArgs(registryId, h, y), this.guardFor(policy, p))).wait();
   }
 
   aggregate(registryId: string, A: G1Point, members: bigint[]): G1Point {
     return acc.aggregateReceiptWithTrapdoor(this.secrets.get(registryId)!, A, members);
   }
 }
-
-const mulG1 = (p: G1Point, k: bigint): G1Point => p.multiply(mod(k));
 
 export class Holder {
   readonly wallet: WalletCredential[] = [];
@@ -213,5 +230,22 @@ export class Verifier {
     const v = verifyPresentation(parse(query), p, ctx);
     const fresh = checkFreshness(p, v.class, v.cas, ctx);
     return { ...v, fresh: fresh.fresh, freshReason: fresh.reason };
+  }
+
+  /**
+   * The proof of the guarded update that created `version` of the registry, read back from the ledger
+   * and checked against the policy it names, at the versions it was bound to.
+   */
+  async verifyGuardProof(registryId: string, version: number): Promise<{ ok: boolean; reason?: string; policyId?: string }> {
+    try {
+      const g = await readGuardProof(this.d, registryId, version);
+      const policy = await readPolicy(this.d, g.policyId);
+      if (g.presentation.query !== policy.query) return { ok: false, policyId: g.policyId, reason: 'the proof presents another query' };
+      const ctx = await loadContext(this.d, policy.bindings, Object.keys(g.presentation.versions));
+      const v = verifyPresentation(parse(policy.query), g.presentation, ctx);
+      return { ok: v.ok, policyId: g.policyId, ...(v.reason ? { reason: v.reason } : {}) };
+    } catch (e) {
+      return { ok: false, reason: (e as Error).message };
+    }
   }
 }
