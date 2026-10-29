@@ -1,0 +1,8 @@
+{
+  "default": {
+    "paths": ["features/**/*.feature"],
+    "import": ["features/support/*.ts", "features/steps/*.ts"],
+    "format": ["./features/steps-formatter.ts"],
+    "formatOptions": { "snippetInterface": "async-await" }
+  }
+}

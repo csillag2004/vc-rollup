@@ -71,6 +71,21 @@ export function attach(addresses: Record<ContractName, string>, runner: ethers.C
   };
 }
 
+/** the custom error a reverted call carries, decoded against every contract of the deployment */
+export function revertName(d: Deployment, e: unknown): string {
+  const x = e as { data?: string; info?: { error?: { data?: string } }; error?: { data?: string }; message?: string };
+  const data = x?.data ?? x?.info?.error?.data ?? x?.error?.data;
+  if (data) {
+    for (const c of [d.state, d.policies, d.credDefs, d.schemas, d.did]) {
+      try {
+        const parsed = c.interface.parseError(data);
+        if (parsed) return parsed.name;
+      } catch { /* not this contract's error */ }
+    }
+  }
+  return (x?.message ?? String(e)).slice(0, 120);
+}
+
 /** the attribute under which an issuer publishes its BBS key in its ethr-DID document */
 export const BBS_KEY_ATTRIBUTE = ethers.encodeBytes32String('did/pub/Bls12381G2/veriKey/hex');
 

@@ -12,7 +12,7 @@
 // Usage: anvil --hardfork prague &   then   node eval/flat-reservation.ts [rpc]
 // On a public chain: eval/op-sepolia.ts (existing contracts, a funded key, labels made unique per run).
 import { ethers } from 'ethers';
-import { deployAll, type Deployment } from '../src/chain/client.ts';
+import { deployAll, revertName, type Deployment } from '../src/chain/client.ts';
 import { Issuer, Holder, Verifier, readGroup, type PolicyRef } from '../src/actors/actors.ts';
 import type { Binding } from '../src/ql/compile.ts';
 
@@ -92,9 +92,7 @@ export async function runFlatReservation(rpc = RPC, opts: FlatOptions = {}): Pro
   try {
     await landlord.guardedRevoke(c.reg, c.ys[1]!, c.policy, qb);
   } catch (e) {
-    const data = (e as any)?.data ?? (e as any)?.info?.error?.data ?? (e as any)?.error?.data;
-    let name = (e as Error).message.slice(0, 120);
-    try { if (data) name = d.state.interface.parseError(data)?.name ?? name; } catch { /* keep message */ }
+    const name = revertName(d, e);
     casRejected = name;
     say(`cas: Bob's guarded revocation rejected: ${name}`);
   }

@@ -48,15 +48,29 @@ export class Issuer {
   private c(name: ContractName): ethers.Contract { return this.d[name].connect(this.signer) as ethers.Contract; }
 
   async setUp(schemaName: string, attributes: string[]): Promise<void> {
+    await this.publishKey();
+    await this.registerCredDef(await this.registerSchema(schemaName, '1.0', attributes));
+  }
+
+  /** a fresh BBS key in the issuer's DID document */
+  async publishKey(): Promise<void> {
     this.kp = await bbs.generateKeyPair();
     await publishBbsKey(this.d, this.signer, this.kp.publicKey);
+  }
+
+  async registerSchema(name: string, version: string, attributes: string[]): Promise<string> {
     const schemas = this.c('schemas');
-    const schemaId = await schemas.registerSchema!.staticCall(schemaName, '1.0', true, attributes);
-    await (await schemas.registerSchema!(schemaName, '1.0', true, attributes)).wait();
+    const schemaId: string = await schemas.registerSchema!.staticCall(name, version, true, attributes);
+    await (await schemas.registerSchema!(name, version, true, attributes)).wait();
+    return schemaId;
+  }
+
+  async registerCredDef(schemaId: string): Promise<string> {
     const me = await this.signer.getAddress();
     const credDefs = this.c('credDefs');
     this.credDefId = await credDefs.registerCredDef!.staticCall(me, schemaId, 'default', ethers.id('bbs-key-1'));
     await (await credDefs.registerCredDef!(me, schemaId, 'default', ethers.id('bbs-key-1'))).wait();
+    return this.credDefId;
   }
 
   async createRegistry(label: string, srsDegree: number): Promise<string> {
@@ -105,7 +119,7 @@ export class Issuer {
     };
   }
 
-  private revokeArgs(registryId: string, h: RegistryHistory, y: bigint) {
+  revokeArgs(registryId: string, h: RegistryHistory, y: bigint) {
     const st = acc.revokeStep(this.secrets.get(registryId)!, h.values[h.values.length - 1]!, y);
     return [registryId, scalarToHex32(y), g1ToEip(st.newA), g2ToEip(st.newRtilde), g1ToEip(st.newWIR)] as const;
   }

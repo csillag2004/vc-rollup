@@ -16,6 +16,7 @@ compare-and-swap. Design and decisions: [`design/PLAN.md`](design/PLAN.md); resu
 | `offchain/src/ql` | parser, NNF, classification, compiler / prover / verifier, freshness, exhaustive check |
 | `offchain/src/chain`, `offchain/src/actors` | ethers client (history from events) and issuer / holder / verifier |
 | `offchain/eval` | flat reservation, classification, benchmarks, gas, report |
+| `offchain/features` | BDD scenarios (cucumber-js): flat reservation, verify on write, classification |
 
 ## Running
 
@@ -26,6 +27,7 @@ forge test                        # 88 tests, real pairings via the Prague preco
 cd offchain && npm test           # off-chain tests
 anvil --hardfork prague &         # local chain with EIP-2537
 npm run demo                      # flat reservation end to end
+npm run bdd                       # Gherkin scenarios (offchain/features) on the local chain
 npm run eval:report               # regenerates design/EVALUATION.md
 ```
 
