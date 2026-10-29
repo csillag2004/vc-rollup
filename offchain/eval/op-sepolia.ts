@@ -50,7 +50,8 @@ async function main(): Promise<void> {
     '| Check | Result |',
     '|---|---|',
     `| naive profile books the flat twice | ${result.naiveDoubleBooking} |`,
-    `| CAS profile rejects the second guarded revocation | ${result.casRejected ?? 'not rejected'} |`,
+    `| the contract rejects the second guarded revocation | ${result.guardRejected ?? 'not rejected'} |`,
+    `| Alice's guard proof, read back from the ledger, is valid | ${result.guardProofFromLedger} |`,
     `| loser's proof ∃x∈S. Revoked(x) valid | ${result.loserProofValid} |`,
     `| loser's proof still valid after later updates | ${result.loserProofStillValidLater} |`,
     `| holder proves "one of S, revoked" without saying which | ${result.holderReservationProof} |`,
@@ -74,7 +75,7 @@ async function main(): Promise<void> {
   md.push(
     '',
     `Total: ${sum(rows.map((r) => r.gasUsed)).toLocaleString('en')} gas, L2 fee ${eth(totalL2)} ETH, L1 data fee ${eth(totalL1)} ETH,`,
-    `balance change ${eth(before - after)} ETH. Rejected calls (the stale guarded revocation, the unguarded revocation`,
+    `balance change ${eth(before - after)} ETH. Rejected calls (the losing guarded revocation, the unguarded revocation`,
     'under a bound policy) fail at gas estimation and are never sent, so they cost nothing.',
     '',
     '## Transactions',

@@ -1,7 +1,8 @@
 // Gas per registry operation on a local Prague chain (anvil), verify on write (EIP-2537).
 import { ethers } from 'ethers';
 import { deployAll } from '../src/chain/client.ts';
-import { Issuer, Holder, readGroup } from '../src/actors/actors.ts';
+import { Issuer, Holder, readGroup, type PolicyRef } from '../src/actors/actors.ts';
+import type { Binding } from '../src/ql/compile.ts';
 
 const RPC = process.argv[2] ?? 'http://127.0.0.1:8545';
 const KEY = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'; // anvil default account
@@ -35,45 +36,47 @@ export async function runGas(rpc = RPC): Promise<GasRow[]> {
   const reg = await issuer.createRegistry('gas-main', 16);
   const holders = Array.from({ length: 16 }, () => new Holder(d));
   for (const [i, h] of holders.entries()) {
-    const w = await record('issueUpdate', i === 0 ? 'Schnorr + 2 pairing checks' : 'repeated', () => issuer.issue(reg, ['flat', `h${i}`], h.linkSecret));
-    h.wallet.push(w);
+    h.wallet.push(await record('issueUpdate', 'y in the clear: G2 MSM + 2 pairing checks + storage', () => issuer.issue(reg, ['flat', `h${i}`], h.linkSecret)));
   }
   const ys = holders.map((h) => h.wallet[0]!.scalars[0]!);
   for (const n of [2, 4, 8, 16]) {
-    await record('createGroup', `|S| = ${n} (on-chain [P_S]_2 + subset check)`, () => issuer.createGroup(reg, `g${n}`, ys.slice(0, n)));
+    await record('createGroup', `|S| = ${n} (every member checked in storage)`, () => issuer.createGroup(reg, `g${n}`, ys.slice(0, n)));
   }
   await record('revoke', 'step + consistency + subset (3 pairing checks)', () => issuer.revoke(reg, ys[15]!));
 
-  // guarded revocations: one per CAS mode, each on its own group
+  // guarded revocations, each under its own policy: two public guards over a group of 4, one presented part
   const g = await readGroup(d, await issuer.createGroup(reg, 'guard-group', ys.slice(4, 8)));
   const gs = await readGroup(d, await issuer.createGroup(reg, 'guard-stable', ys.slice(8, 12)));
-  const pGroup = await record('registerPolicy', 'co-stable, group CAS', () => issuer.registerPolicy('forall x in S. NotRevoked(x)', [['S', g]]));
-  const pGlobal = await issuer.registerPolicy('forall x in S. NotRevoked(x) & forall y in Issued. NotRevoked(y)', [['S', g], ['Issued', { kind: 'registry', registryId: reg }]]);
-  await issuer.revoke(reg, ys[14]!); // makes the Issued conjunct false later; register first
+  const R: Binding = { kind: 'registry', registryId: reg };
+  const pGroup = await record('registerPolicy', 'public part: forall x in S. NotRevoked(x)', () => issuer.registerPolicy('forall x in S. NotRevoked(x)', [['S', g]]));
   const pStable = await issuer.registerPolicy('exists x in S. Revoked(x)', [['S', gs]]);
-  await issuer.revoke(reg, ys[8]!);
+  const pPresented = await record('registerPolicy', 'presented part: exists x in Presented. Sig(x, "R") & NotRevoked(x)',
+    () => issuer.registerPolicy('exists x in Presented. Sig(x, "R") & NotRevoked(x)', [['R', R]]));
+  await issuer.revoke(reg, ys[8]!); // makes the stable guard true
 
-  const h4 = holders[4]!;
-  const pres = await h4.present(pGroup.query, pGroup.bindings, 'g');
-  await record('guardedRevoke', 'group CAS (policy lookup + group version)', () => issuer.guardedRevoke(reg, ys[4]!, pGroup, pres));
-  const presS = await holders[9]!.present(pStable.query, pStable.bindings, 's');
-  await record('guardedRevoke', 'stable guard, no comparison', () => issuer.guardedRevoke(reg, ys[9]!, pStable, presS));
-  void pGlobal;
+  const guarded = async (detail: string, policy: PolicyRef, holder: Holder, y: bigint) => {
+    const p = await holder.present(policy.query, policy.bindings, detail);
+    const bytes = issuer.guardFor(policy, p).proof.length;
+    await record('guardedRevoke', `${detail}; proof ${bytes} B on the ledger`, () => issuer.guardedRevoke(reg, y, policy, p));
+  };
+  await guarded('public group guard forall x in S. NotRevoked(x), |S| = 4 (counted on chain)', pGroup, holders[4]!, ys[4]!);
+  await guarded('public stable group guard exists x in S. Revoked(x), |S| = 4', pStable, holders[9]!, ys[9]!);
+  await guarded('presented part, co-stable: one credential, one version comparison', pPresented, holders[0]!, ys[13]!);
   return rows;
 }
 
 export function gasTable(rows: GasRow[]): string {
   const merged = new Map<string, { operation: string; detail: string; gas: bigint[] }>();
   for (const r of rows) {
-    const k = `${r.operation}|${r.detail === 'repeated' ? 'Schnorr + 2 pairing checks' : r.detail}`;
-    const m = merged.get(k) ?? { operation: r.operation, detail: r.detail === 'repeated' ? 'Schnorr + 2 pairing checks' : r.detail, gas: [] };
+    const k = `${r.operation}|${r.detail}`;
+    const m = merged.get(k) ?? { operation: r.operation, detail: r.detail, gas: [] };
     m.gas.push(r.gas.reduce((a, b) => a + b, 0n));
     merged.set(k, m);
   }
   const lines = ['| Operation | Detail | Gas (median of runs) | Runs |', '|---|---|---:|---:|'];
   for (const m of merged.values()) {
     const sorted = [...m.gas].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
-    lines.push(`| ${m.operation} | ${m.detail} | ${sorted[Math.floor(sorted.length / 2)]} | ${sorted.length} |`);
+    lines.push(`| ${m.operation} | ${m.detail.replaceAll('|', '\\|')} | ${sorted[Math.floor(sorted.length / 2)]} | ${sorted.length} |`);
   }
   return lines.join('\n');
 }

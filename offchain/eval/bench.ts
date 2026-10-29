@@ -95,7 +95,7 @@ export async function runBench(): Promise<BenchRow[]> {
 
 export function benchTable(rows: BenchRow[]): string {
   const lines = ['| Case | Rule | Prove (ms) | Verify (ms) | Size (bytes) |', '|---|---|---:|---:|---:|'];
-  for (const r of rows) lines.push(`| ${r.case} | ${r.rule} | ${r.proveMs.toFixed(1)} | ${r.verifyMs.toFixed(1)} | ${r.bytes} |`);
+  for (const r of rows) lines.push(`| ${r.case.replaceAll('|', '\\|')} | ${r.rule} | ${r.proveMs.toFixed(1)} | ${r.verifyMs.toFixed(1)} | ${r.bytes} |`);
   return lines.join('\n');
 }
 
