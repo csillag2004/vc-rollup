@@ -267,9 +267,10 @@ contract StateRegistryTest is Test {
 
     function test_issueWrongWIRReverts() public {
         (bytes memory i,) = _issueValues(Y1);
+        bytes memory bad = BLS.g1Mul(curW, 7);
         vm.prank(alice);
         vm.expectRevert(StateRegistry.SubsetCheckFailed.selector);
-        registry.issueUpdate(regId, bytes32(Y1), i, BLS.g1Mul(curW, 7));
+        registry.issueUpdate(regId, bytes32(Y1), i, bad);
     }
 
     function test_issueOnlyIssuer() public {

@@ -34,15 +34,6 @@ contract StateRegistry {
         uint256 createdAt;
     }
 
-    /// kiadási lépés: az y titkos marad, T = I^y és Schnorr-bizonyítás (R, z) arról, hogy ismert
-    struct IssueStep {
-        bytes newI;
-        bytes newWIR;
-        bytes T;
-        bytes R;
-        uint256 z;
-    }
-
     /// guard: melyik policy alapján, a kötések szerinti várt verziók, és a bizonyítás hash-e
     struct Guard {
         bytes32 policyId;
@@ -59,12 +50,14 @@ contract StateRegistry {
     mapping(bytes32 registryId => mapping(uint64 version => bytes32)) private valuesHashes;      // keccak(A, R̃, I)
     mapping(bytes32 registryId => mapping(bytes32 y => uint64)) private revokedAtVersion;        // 0 = nincs visszavonva
     mapping(bytes32 registryId => bytes32[]) private revokedLog;                                  // append-only
+    mapping(bytes32 registryId => mapping(bytes32 y => uint64)) private issuedAtVersion;         // 0 = nincs kiadva
+    mapping(bytes32 registryId => bytes32[]) private issuedLog;                                   // append-only
     mapping(bytes32 groupId => Group) private groups;
 
     event RegistryCreated(bytes32 indexed registryId, bytes32 indexed credDefId, bytes32 label, bytes V0, bytes Qtilde, bytes Q);
     event SrsPublished(bytes32 indexed registryId, uint32 degree, bytes[] g1Powers, bytes[] g2Powers);
     // guardDigest = 0 a nem őrzött frissítésnél; egyébként keccak256(abi.encode(policyId, proofHash))
-    event Issued(bytes32 indexed registryId, uint64 indexed version, bytes newI, bytes newWIR, bytes32 guardDigest);
+    event Issued(bytes32 indexed registryId, uint64 indexed version, bytes32 indexed y, bytes newI, bytes newWIR, bytes32 guardDigest);
     event Revoked(bytes32 indexed registryId, uint64 indexed version, bytes32 indexed y, bytes newA, bytes newRtilde, bytes newWIR, bytes32 guardDigest);
     event GroupCreated(bytes32 indexed groupId, bytes32 indexed registryId, address indexed creator, bytes32 label, bytes32[] members);
 
@@ -76,12 +69,14 @@ contract StateRegistry {
     error EmptyRevocationId();
     error RevocationIdOutOfField(bytes32 y);
     error AlreadyRevoked(bytes32 y);
+    error AlreadyIssued(bytes32 y);
+    error NotIssued(bytes32 y);
+    error MemberNotIssued(bytes32 y);
     error KeyMismatch();
     error InvalidPoint();
     error StepCheckFailed();
     error ConsistencyCheckFailed();
     error SubsetCheckFailed();
-    error IssueProofFailed();
     error StaleVersion(uint256 index, uint64 expected, uint64 current);
     error StaleGroupVersion(bytes32 groupId, uint64 expected, uint64 current);
     error PolicyRequired(bytes32 policyId);
@@ -92,7 +87,6 @@ contract StateRegistry {
     error EmptyGroup();
     error MembersNotSorted(uint256 index);
     error GroupTooLarge(uint256 size, uint32 srsDegree);
-    error GroupSubsetCheckFailed();
     error IndexOutOfRange(uint256 index);
     error SrsAlreadyPublished();
     error SrsNotPublished();
@@ -186,20 +180,24 @@ contract StateRegistry {
 
 
     ///KIADÁS
-    function issueUpdate(bytes32 registryId, IssueStep calldata step)
+    function issueUpdate(bytes32 registryId, bytes32 y, bytes calldata newI, bytes calldata newWIR)
         external onlyIssuer(registryId) whenInitialized(registryId)
     {
         bytes32 credDefId = registries[registryId].credDefId;
         bytes32 bound = policyRegistry.boundPolicy(credDefId, PolicyRegistry.Action.Issue);
         if (bound != bytes32(0)) revert PolicyRequired(bound);
-        _applyIssue(registryId, step, bytes32(0));
+        _applyIssue(registryId, y, newI, newWIR, bytes32(0));
     }
 
-    function guardedIssueUpdate(bytes32 registryId, IssueStep calldata step, Guard calldata guard)
-        external onlyIssuer(registryId) whenInitialized(registryId)
-    {
+    function guardedIssueUpdate(
+        bytes32 registryId,
+        bytes32 y,
+        bytes calldata newI,
+        bytes calldata newWIR,
+        Guard calldata guard
+    ) external onlyIssuer(registryId) whenInitialized(registryId) {
         bytes32 digest = _checkGuard(registries[registryId].credDefId, PolicyRegistry.Action.Issue, guard);
-        _applyIssue(registryId, step, digest);
+        _applyIssue(registryId, y, newI, newWIR, digest);
     }
 
 
@@ -231,31 +229,26 @@ contract StateRegistry {
 
 
     ///CSOPORTOK
-    /// Csak kiadott ID-k: e(W_S, [P_S]_2) = e(I, g̃), ahol [P_S]_2-t a contract számolja a tagokból és a G2 SRS-ből.
-    function createGroup(
-        bytes32 registryId,
-        bytes32 label,
-        bytes32[] calldata members,
-        bytes calldata WS,
-        bytes[] calldata g2Powers
-    ) external whenInitialized(registryId) returns (bytes32 groupId) {
+    /// Csak kiadott ID-k, a tároló szerint; ez az α birtokosát is köti. Bárki létrehozhat csoportot.
+    /// A méretkorlát az SRS foka, mert az off-chain aggregált tanúhoz [P_S]_2 kell.
+    function createGroup(bytes32 registryId, bytes32 label, bytes32[] calldata members)
+        external whenInitialized(registryId) returns (bytes32 groupId)
+    {
         Registry storage r = registries[registryId];
         uint32 degree = r.srsDegree;
         if (members.length == 0) revert EmptyGroup();
         if (members.length > degree) revert GroupTooLarge(members.length, degree);
         if (members[0] == bytes32(0)) revert EmptyRevocationId();
+        mapping(bytes32 => uint64) storage issued = issuedAtVersion[registryId];
         for (uint256 i = 0; i < members.length; i++) {
             if (uint256(members[i]) >= BLS.R) revert RevocationIdOutOfField(members[i]);
             if (i > 0 && members[i] <= members[i - 1]) revert MembersNotSorted(i);
+            if (issued[members[i]] == 0) revert MemberNotIssued(members[i]);
         }
-        if (keccak256(abi.encode(g2Powers)) != r.g2SrsHash) revert SrsMismatch(0);
 
         groupId = keccak256(abi.encode(registryId, msg.sender, label));
         Group storage g = groups[groupId];
         if (g.createdAt != 0) revert GroupExists(groupId);
-
-        BLS.checkG1(WS);
-        if (!BLS.pairingEq(WS, _groupPolyG2(members, g2Powers), r.I, BLS.g2())) revert GroupSubsetCheckFailed();
 
         g.registryId = registryId;
         g.creator = msg.sender;
@@ -320,8 +313,29 @@ contract StateRegistry {
         return revokedAtVersion[registryId][y];
     }
 
-    function revokedCount(bytes32 registryId) external view returns (uint256) {
+    function revokedCount(bytes32 registryId) public view returns (uint256) {
         return revokedLog[registryId].length;
+    }
+
+    function isIssued(bytes32 registryId, bytes32 y) external view returns (bool) {
+        return issuedAtVersion[registryId][y] != 0;
+    }
+
+    /// Melyik versionnél került y I-be (0 = nincs kiadva).
+    function issuedAt(bytes32 registryId, bytes32 y) external view returns (uint64) {
+        return issuedAtVersion[registryId][y];
+    }
+
+    function issuedCount(bytes32 registryId) public view returns (uint256) {
+        return issuedLog[registryId].length;
+    }
+
+    function getIssuedLog(bytes32 registryId, uint256 start, uint256 count) external view returns (bytes32[] memory out) {
+        bytes32[] storage log = issuedLog[registryId];
+        if (start > log.length) revert IndexOutOfRange(start);
+        uint256 end = start + count > log.length ? log.length : start + count;
+        out = new bytes32[](end - start);
+        for (uint256 i = start; i < end; i++) out[i - start] = log[i];
     }
 
     /// Lapozható olvasás a holderek receipt-frissítéséhez.
@@ -358,16 +372,6 @@ contract StateRegistry {
         return false;
     }
 
-    /// a kiadási Schnorr-bizonyítás kihívása; az off-chain kód ugyanezt számolja
-    function issueChallenge(bytes32 registryId, bytes calldata newI, bytes calldata T, bytes calldata R)
-        public view returns (uint256)
-    {
-        Registry storage r = registries[registryId];
-        return uint256(keccak256(abi.encode(
-            "revoq/issue/v1", block.chainid, address(this), registryId, r.version, r.I, newI, T, R
-        ))) % BLS.R;
-    }
-
 
     ///SEGÉDFÜGGVÉNYEK
     function _valuesHash(Registry storage r) private view returns (bytes32) {
@@ -387,37 +391,42 @@ contract StateRegistry {
         return r.credDefId;
     }
 
-    /// Kiadás: I' = I^(y+α), W_IR' = W_IR^(y+α), y rejtve marad.
-    /// (1) Schnorr: I^z = R · T^c, (2) e(I' - T, g̃) = e(I, Q̃), (3) e(W_IR', R̃) = e(I', g̃).
-    function _applyIssue(bytes32 registryId, IssueStep calldata s, bytes32 guardDigest) private {
+    /// Kiadás: I' = I^(y+α), W_IR' = W_IR^(y+α); y nyilvános.
+    /// Tároló: y még nincs kiadva. I' ≠ 1, különben y = −α. Lépés: e(I', g̃) = e(I, g̃^y·Q̃); részhalmaz: e(W_IR', R̃) = e(I', g̃).
+    /// A lépés-ellenőrzés I'-t egyértelműen rögzíti I-ből és y-ból, így α ismerete sem enged más értéket.
+    function _applyIssue(
+        bytes32 registryId,
+        bytes32 y,
+        bytes calldata newI,
+        bytes calldata newWIR,
+        bytes32 guardDigest
+    ) private {
+        if (y == bytes32(0)) revert EmptyRevocationId();
+        if (uint256(y) >= BLS.R) revert RevocationIdOutOfField(y);
+        if (issuedAtVersion[registryId][y] != 0) revert AlreadyIssued(y);
+        BLS.checkG1(newI);
+        BLS.checkG1(newWIR);
+        if (BLS.isZero(newI)) revert InvalidPoint();
+
         Registry storage r = registries[registryId];
-        BLS.checkG1(s.newI);
-        BLS.checkG1(s.newWIR);
-        BLS.checkG1(s.T);
-        BLS.checkG1(s.R);
-        if (BLS.isZero(s.T)) revert InvalidPoint();
+        if (!BLS.pairingEq(newI, BLS.g2(), r.I, _g2yQ(r, y))) revert StepCheckFailed();
+        if (!BLS.pairingEq(newWIR, r.Rtilde, newI, BLS.g2())) revert SubsetCheckFailed();
 
-        uint256 c = issueChallenge(registryId, s.newI, s.T, s.R);
-        bytes[] memory ps = new bytes[](2);
-        uint256[] memory ss = new uint256[](2);
-        ps[0] = r.I; ss[0] = s.z % BLS.R;
-        ps[1] = s.T; ss[1] = BLS.R - c;
-        if (keccak256(BLS.g1Msm(ps, ss)) != keccak256(s.R)) revert IssueProofFailed();
-
-        bytes memory iMinusT = BLS.g1Add(s.newI, BLS.g1Neg(s.T));
-        if (!BLS.pairingEq(iMinusT, BLS.g2(), r.I, r.Qtilde)) revert StepCheckFailed();
-        if (!BLS.pairingEq(s.newWIR, r.Rtilde, s.newI, BLS.g2())) revert SubsetCheckFailed();
-
-        r.I = s.newI;
-        r.WIR = s.newWIR;
+        r.I = newI;
+        r.WIR = newWIR;
         r.version += 1;                                  // a kiadás is új version
         valuesHashes[registryId][r.version] = _valuesHash(r);
-        emit Issued(registryId, r.version, s.newI, s.newWIR, guardDigest);
+
+        issuedAtVersion[registryId][y] = r.version;
+        issuedLog[registryId].push(y);
+
+        emit Issued(registryId, r.version, y, newI, newWIR, guardDigest);
     }
 
     /// Visszavonás: A' = A^(1/(y+α)), R̃' = R̃^(y+α), W_IR' = W_IR^(1/(y+α)).
     /// Lépés: e(A', g̃^y·Q̃) = e(A, g̃); konzisztencia: e(A', R̃') = e(V0, g̃); részhalmaz: e(W_IR', R̃') = e(I, g̃).
     /// A lépés-ellenőrzés egyben az értékek frissességét is garantálja: A' csak az aktuális A-ból léphet.
+    /// Tároló: y kiadott és még nincs visszavonva. Kiadott y-ra α + y ≠ 0, ezért A' és R̃' nem lehet 1.
     function _applyRevoke(
         bytes32 registryId,
         bytes32 y,
@@ -428,19 +437,14 @@ contract StateRegistry {
     ) private {
         if (y == bytes32(0)) revert EmptyRevocationId();
         if (uint256(y) >= BLS.R) revert RevocationIdOutOfField(y);
+        if (issuedAtVersion[registryId][y] == 0) revert NotIssued(y);
         if (revokedAtVersion[registryId][y] != 0) revert AlreadyRevoked(y);
         BLS.checkG1(newA);
         BLS.checkG2(newRtilde);
         BLS.checkG1(newWIR);
 
         Registry storage r = registries[registryId];
-        bytes[] memory ps = new bytes[](2);
-        uint256[] memory ss = new uint256[](2);
-        ps[0] = BLS.g2(); ss[0] = uint256(y);
-        ps[1] = r.Qtilde; ss[1] = 1;
-        bytes memory gyQ = BLS.g2Msm(ps, ss);
-
-        if (!BLS.pairingEq(newA, gyQ, r.A, BLS.g2())) revert StepCheckFailed();
+        if (!BLS.pairingEq(newA, _g2yQ(r, y), r.A, BLS.g2())) revert StepCheckFailed();
         if (!BLS.pairingEq(newA, newRtilde, r.V0, BLS.g2())) revert ConsistencyCheckFailed();
         if (!BLS.pairingEq(newWIR, newRtilde, r.I, BLS.g2())) revert SubsetCheckFailed();
 
@@ -493,12 +497,13 @@ contract StateRegistry {
         return g.registryId;
     }
 
-    /// [P_S]_2 = Σ c_j · g̃^(α^j)
-    function _groupPolyG2(bytes32[] calldata members, bytes[] calldata g2Powers) private view returns (bytes memory) {
-        uint256[] memory c = BLS.setPolyCoeffs(members);
-        bytes[] memory ps = new bytes[](c.length);
-        for (uint256 j = 0; j < c.length; j++) ps[j] = g2Powers[j];
-        return BLS.g2Msm(ps, c);
+    /// g̃^y · Q̃
+    function _g2yQ(Registry storage r, bytes32 y) private view returns (bytes memory) {
+        bytes[] memory ps = new bytes[](2);
+        uint256[] memory ss = new uint256[](2);
+        ps[0] = BLS.g2(); ss[0] = uint256(y);
+        ps[1] = r.Qtilde; ss[1] = 1;
+        return BLS.g2Msm(ps, ss);
     }
 
     function _checkSrsStructure(bytes[] calldata g1p, bytes[] calldata g2p, bytes memory Qtilde, bytes32 seed)
