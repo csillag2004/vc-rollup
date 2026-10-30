@@ -3,7 +3,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { runClassification, classificationTable } from './classify-exhaustive.ts';
+import { runClassification, classificationTable, runChainClassification, chainTable } from './classify-exhaustive.ts';
 import { runBench, benchTable } from './bench.ts';
 import { runFlatReservation } from './flat-reservation.ts';
 import { runGas, gasTable } from './gas.ts';
@@ -11,6 +11,10 @@ import { runGas, gasTable } from './gas.ts';
 const out = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'design', 'EVALUATION.md');
 
 const cls = runClassification();
+const [chain, shapes] = await runChainClassification();
+for (const c of [chain!, shapes!]) {
+  if (c.mismatches.length) throw new Error(`the contract classifies ${c.label} differently:\n${c.mismatches.slice(0, 20).join('\n')}`);
+}
 const bench = await runBench();
 const flat = await runFlatReservation();
 const gas = await runGas();
@@ -28,7 +32,8 @@ Alice and Bob both prove the guard \`forall x in S. NotRevoked(x)\` against the 
 | Profile | Outcome |
 |---|---|
 | Naive (no policy bound, the landlord checks the guard, then revokes) | double booking: ${flat.naiveDoubleBooking ? '2 members of S revoked' : 'not reproduced'} |
-| CAS (policy bound to Revoke, group CAS) | second guarded revocation rejected on chain: \`${flat.casRejected}\` |
+| Guarded (policy bound to Revoke; the contract evaluates the guard when the revocation executes) | second guarded revocation rejected on chain: \`${flat.guardRejected}\` |
+| Alice's guard proof, read back from the \`GuardProof\` event and verified | valid: ${flat.guardProofFromLedger} |
 | Loser's proof \`!(forall x in S. NotRevoked(x))\` → \`exists x in S. Revoked(x)\` (stable) | valid: ${flat.loserProofValid}; still valid after later issuance and revocation: ${flat.loserProofStillValidLater} |
 | Alice: \`exists x in S. Sig(x, "Landlord") & Revoked(x)\` (hidden member) | valid: ${flat.holderReservationProof} |
 
@@ -40,17 +45,35 @@ ${flat.log.join('\n')}
 
 ## 2. Soundness of the syntactic classification (exhaustive)
 
-Random closed formulas (depth ≤ 4, all quantifiers, all registry atoms and \`Active\`), universe of 4 IDs,
-groups S = {1,2,3}, T = {2,4}, Presented = {1,4}; for every formula every pair of states Σ ⊑ Σ′ is
-enumerated (81 states in the general model). A violation would be a "stable" formula that turns false,
-a "co-stable" one that turns true, or a "state-independent" one that changes.
+Random closed formulas (depth ≤ 4, all quantifiers, all registry atoms and \`Active\`; a quantifier over
+Presented names its registry with \`Sig(x, "R")\`), universe of 4 IDs, groups S = {1,2,3}, T = {2,4},
+Presented = {1,4}; for every formula every pair of states Σ ⊑ Σ′ is enumerated (81 states in the general
+model). A violation would be a "stable" formula that turns false, a "co-stable" one that turns true, or a
+"state-independent" one that changes. In the system model the front end desugars \`Active\`, \`Issued\` and
+\`NotIssued\` over the one atom \`Revoked\` and folds the constants this leaves.
 
 ${classificationTable(cls)}
 
 No violations: every stable / co-stable / state-independent verdict is semantically correct. The last
 column is the price of a syntax-directed criterion: most formulas classified volatile are semantically
-stable or co-stable (e.g. \`forall x in S. Revoked(x) | NotRevoked(x)\`), so they get a stronger CAS than
-needed (dashboard Open 15).
+stable or co-stable (e.g. \`forall x in S. Revoked(x) | NotRevoked(x)\`), so a non-stable presented part gets
+a version comparison it may not need (dashboard Open 15).
+
+**Against the contract.** Of the ${chain!.formulas} system-model formulas, ${chain!.compiled} split as \`presented ∧ public\`
+and compile to the two programs (${chain!.trivial} of them fold to \`true\`, so both programs are empty). The other
+${chain!.formulas - chain!.compiled} cannot be bound on chain: for example, the formula is false in every state, a clause over a
+group or Issued has a body other than one status atom, or a clause over Presented uses ∀ or at most.
+For each compiled formula, \`registerPolicy\` (\`eth_call\` on anvil) accepts the programs and
+\`PolicyRegistry.classify\` returns the front end's class for both: ${chain!.mismatches.length} mismatches.
+Compiled formulas by the class of their presented part (rows) and public part (columns):
+
+${chainTable(chain!)}
+
+The random formulas reach some combinations rarely, so the same check also runs on every clause the contract
+accepts (over S, Issued and Presented, k ≤ 2, every body polarity), alone and in every pair (∧ for any two,
+∨ for two of the same part): ${shapes!.formulas} queries, ${shapes!.compiled} compiled, ${shapes!.mismatches.length} mismatches.
+
+${chainTable(shapes!)}
 
 ## 3. Proof cost per rule (off-chain)
 
@@ -63,9 +86,12 @@ and the sigma proof. A presented credential costs Ā, B̄, D, K (and K_ls) plus 
 
 ${gasTable(gas)}
 
-Every revocation runs three pairing checks (step, consistency, subset); an issuance runs a Schnorr
-check with a G1 MSM and two pairing checks; a guarded update adds the policy lookup and one version
-comparison per binding. Group creation computes \`[P_S]_2\` on chain (G2 MSM over |S|+1 SRS powers).
+Every revocation runs three pairing checks (step, consistency, subset) and checks in storage that y is
+issued and not revoked; an issuance computes \`g̃^y·Q̃\` (G2 MSM), runs two pairing checks (step, subset) and
+records y. Group creation checks every member in storage (no pairing). A guarded update adds the policy
+lookup, the evaluation of the public program (a group clause counts its revoked members), one version
+comparison per registry a non-stable presented part refers to, and the proof bytes, which travel as
+calldata and stay on the ledger in the \`GuardProof\` event.
 `;
 fs.writeFileSync(out, md);
 console.log(`wrote ${out}`);

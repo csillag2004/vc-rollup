@@ -1,6 +1,7 @@
 // Exhaustive semantic check of the syntactic classification on a small universe:
 // every reachable pair of states Σ ⊑ Σ' is enumerated, and each verdict is checked against the
-// semantic definitions (stable: true stays true; co-stable: false stays false).
+// semantic definitions (stable: true stays true; co-stable: false stays false). The same formulas
+// are compared with the contract's classification in eval/classify-exhaustive.ts.
 import type { Formula, Domain, QuantKind } from './ast.ts';
 import { classify, type FormulaClass } from './logic.ts';
 import { holds, type State, type Env } from './semantics.ts';
@@ -64,7 +65,21 @@ export function randomFormula(r: () => number, depth: number, vars: string[], do
   if (choice < 0.65) return { t: 'implies', a: randomFormula(r, depth - 1, vars, domains), b: randomFormula(r, depth - 1, vars, domains) };
   const v = `x${vars.length}`;
   const q = pick<QuantKind>(['forall', 'exists', 'atleast', 'atmost']);
-  return { t: 'quant', q, k: q === 'atleast' || q === 'atmost' ? Math.floor(r() * 3) : 0, v, dom: pick(domains), body: randomFormula(r, depth - 1, [...vars, v], domains) };
+  const k = q === 'atleast' || q === 'atmost' ? Math.floor(r() * 3) : 0;
+  const dom = pick(domains);
+  const body = randomFormula(r, depth - 1, [...vars, v], domains);
+  // a presented credential names the registry it comes from, as a guard over Presented must (Sig is neutral)
+  return { t: 'quant', q, k, v, dom, body: dom.kind === 'presented' ? { t: 'and', fs: [{ t: 'atom', name: 'Sig', args: [v, 'R'] }, body] } : body };
+}
+
+const domainsOfConfig = (cfg: Pick<ExhaustiveConfig, 'groups'>): Domain[] =>
+  [...[...cfg.groups.keys()].map((name) => ({ kind: 'group', name }) as Domain), { kind: 'presented' }, { kind: 'issued', name: 'Issued' }];
+
+/** the formulas runExhaustive checks, in order (a pure function of the configuration) */
+export function enumerateFormulas(cfg: Pick<ExhaustiveConfig, 'groups' | 'formulas' | 'maxDepth' | 'seed'>): Formula[] {
+  const r = rng(cfg.seed);
+  const domains = domainsOfConfig(cfg);
+  return Array.from({ length: cfg.formulas }, () => randomFormula(r, 1 + Math.floor(r() * cfg.maxDepth), [], domains));
 }
 
 export function runExhaustive(cfg: ExhaustiveConfig): ExhaustiveRow[] {
@@ -73,16 +88,13 @@ export function runExhaustive(cfg: ExhaustiveConfig): ExhaustiveRow[] {
   const model = { domainsIssued: cfg.domainsIssued };
   const pairs: [State, State][] = [];
   for (const a of all) for (const b of all) if (leq(a, b)) pairs.push([a, b]);
-  const domains: Domain[] = [...[...cfg.groups.keys()].map((name) => ({ kind: 'group', name }) as Domain), { kind: 'presented' }, { kind: 'issued', name: 'Issued' }];
-  const r = rng(cfg.seed);
   const rows = new Map<FormulaClass, ExhaustiveRow>();
   for (const verdict of ['state-independent', 'stable', 'co-stable', 'volatile'] as FormulaClass[]) {
     rows.set(verdict, { verdict, formulas: 0, violations: 0, gap: 0 });
   }
   const env = (s: State): Env => ({ state: s, states: new Map([['Issued', s]]), groups: cfg.groups, presented: cfg.presented });
 
-  for (let i = 0; i < cfg.formulas; i++) {
-    const f = randomFormula(r, 1 + Math.floor(r() * cfg.maxDepth), [], domains);
+  for (const f of enumerateFormulas(cfg)) {
     const verdict = classify(f, model);
     const row = rows.get(verdict)!;
     row.formulas++;

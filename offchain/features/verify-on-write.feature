@@ -18,10 +18,10 @@ Feature: Verify on write
     Then the revocation is rejected with "StepCheckFailed"
     And Alice's credential is not revoked
 
-  Scenario: A group witness must match the set
+  Scenario: A group holds issued credentials only
     Given a schema "Interest" version "1.0" with attributes "flat" and "name"
     And the landlord registers a CredDef for the schema "Interest"
     And a revocation registry for the CredDef with a published SRS
     And the landlord has issued interest credentials to Alice and Bob
-    When the landlord anchors the group {Alice, Bob} with the witness of {Alice}
-    Then the group creation is rejected with "GroupSubsetCheckFailed"
+    When the landlord anchors a group of Alice and an ID that was never issued
+    Then the group creation is rejected with "MemberNotIssued"

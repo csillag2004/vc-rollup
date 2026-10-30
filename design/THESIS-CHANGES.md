@@ -9,19 +9,19 @@ Reference: `TDK26-Kocsis-Kamilla/content/proposed-approach.tex`, `background.tex
 
 ## 3.1 System model, 3.4 VDR
 4. `def:representation`, `def:accumulator-updates`: `A = V0^{1/P_Rev(α)}` (static add); issuing changes only I (and `W_IR`). Fix `lem:representation` accordingly.
-5. Groups (def:domains, first item): a finite set of **already issued** credential IDs, fixed by a party other than the prover, anchored in the VDR with an on-chain subset check `e(W_S, [P_S]_2) = e(I, g̃)`. Scope: `W_S = I^{1/P_S(α)}` can be computed for *any* set by whoever knows α, so the check binds an honest issuer only (like every check that compares values at α); without α, `W_S` needs the whole issued set, so in practice only the issuer anchors groups.
-6. `def:group-version`: say explicitly that, by 5., the only update that can touch a member is revocation.
+5. *Superseded by 21.* Groups (def:domains, first item): a finite set of **already issued** credential IDs, fixed by a party other than the prover, anchored in the VDR with an on-chain subset check `e(W_S, [P_S]_2) = e(I, g̃)`. Scope: `W_S = I^{1/P_S(α)}` can be computed for *any* set by whoever knows α, so the check binds an honest issuer only (like every check that compares values at α); without α, `W_S` needs the whole issued set, so in practice only the issuer anchors groups.
+6. `def:group-version`: say explicitly that, by 5., the only update that can touch a member is revocation. (5. is superseded; the reason is now 21.)
 7. VDR components: add the PolicyRegistry and CredDef-level rules (policy bound to issue / revoke / present). Consider a new claim in the S1–S10 table ("policy-enforced lifecycle").
 
 ## 3.2 Trust model
-8. Verify on write is now true: the contract checks step, consistency and subset on every revocation; issuance is step-checked in zero knowledge (`T = I^y` + Schnorr, y stays hidden). Uniqueness of a fresh y is not checkable and rests on the honest issuer.
-9. Guard proofs are checked off-chain by the updater; the chain stores a guard digest. Say so in the scope.
+8. *Superseded by 19 and 20; the revocation checks stand.* Verify on write is now true: the contract checks step, consistency and subset on every revocation; issuance is step-checked in zero knowledge (`T = I^y` + Schnorr, y stays hidden). Uniqueness of a fresh y is not checkable and rests on the honest issuer.
+9. *Superseded by 22 and 24.* Guard proofs are checked off-chain by the updater; the chain stores a guard digest. Say so in the scope.
 
 ## 3.3 Atomic guarded update
 10. Formula classes: use stable / co-stable / volatile everywhere; line ~402 says "non-stable"; cite Chandy–Lamport precisely.
 11. `lem:closure` (d) is incomplete (e.g. `atmost k x∈Issued. NotRevoked(x)` is volatile); add the polarity rules (↑/↓/mixed, `∀x∈Issued` = ↓ ⊔ body, `∃/atleast x∈Issued` = ↑ ⊔ body, `atmost` flips).
-12. `def:fresh-guard` (b) stays (group CAS also for volatile group-only formulas).
-13. Guards may span several registries (e.g. "issue X only if Y is revoked"); the update then carries the expected version of every bound registry or group. Generalise the fresh-guard definition to a set of versions.
+12. *The group CAS is superseded by 23: the contract evaluates group clauses when the update executes. Readers may still compare group versions to check off-chain that a presentation over groups is fresh.* `def:fresh-guard` (b) stays (group CAS also for volatile group-only formulas).
+13. *Narrowed by 23: only the registries a co-stable or volatile presented part refers to carry an expected version; groups carry none.* Guards may span several registries (e.g. "issue X only if Y is revoked"); the update then carries the expected version of every bound registry or group. Generalise the fresh-guard definition to a set of versions.
 14. Value freshness is enforced by the on-chain step checks (new values must step from the current ones), so a separate expected global version is not needed for it.
 
 ## 3.5 Query language
@@ -31,3 +31,12 @@ Reference: `TDK26-Kocsis-Kamilla/content/proposed-approach.tex`, `background.tex
 
 ## Evaluation (empty chapter)
 18. TOCTOU pair (naive vs CAS), exhaustive classification check, benchmark table: numbers in `design/EVALUATION.md` once produced.
+
+## Issuer-bound updates and contract-checked guards (`GUARDS.md`)
+19. Issuance reveals y (3.1 `def:accumulator-updates`, 3.2). `issueUpdate(registryId, y, I', W_IR')`: the contract checks `y ≠ 0`, `y < r`, that y is not issued yet (in storage), `I' ≠ 1` (this rules out `y = −α`), the step `e(I', g̃) = e(I, g̃^y·Q̃)` and the subset check. Uniqueness of y is now checked rather than trusted to the issuer. The issued IDs and their issuance versions become public; presentations still hide y.
+20. Storage checks bind the trapdoor holder (3.2). The adversary includes the issuer, who knows α and can therefore pass any check that compares values at α: it can compute `W_IR` for a revoked set that is not a subset of the issued one. The set relations are checked in storage instead: a revocation needs y issued and not yet revoked, an issuance needs y not yet issued. The pairing checks stay and keep their meaning against parties without α. The step checks bind everyone, because given the stored values and y they fix the new value uniquely. The issuer still decides what to issue and revoke, and when.
+21. Groups are checked in storage (3.1 `def:domains`, 3.4). `createGroup(registryId, label, members)` requires every member to be issued (`MemberNotIssued`). There is no `W_S` and no pairing check, anyone may create a group, and `|S|` stays bounded by the SRS degree because off-chain aggregate receipts need `[P_S]_2`.
+22. The contract evaluates the public part of a guard and computes the classes (3.3, 3.4). A policy is the query text, its bindings and two postfix programs in negation normal form over the one status atom: `presented` (clauses over Presented, proved by the holder) and `public` (clauses over groups and Issued whose body is `Revoked(x)` or `NotRevoked(x)`). The guard is `presented ∧ public`. At registration the contract validates both programs and classifies them with the polarity rules of 11; nobody declares a class or a compare-and-swap mode. When a guarded update executes, the contract evaluates `public` with counters (the revoked members of a group; the issued and revoked counts of a registry) and reverts with `GuardFalse` if it is false. A query that does not split this way cannot be bound to an on-chain action.
+23. Compare-and-swap only for a non-stable presented part (3.3 `def:fresh-guard`). The contract compares the expected global version of each registry a presented clause refers to, and only when the presented class is co-stable or volatile. Public clauses are evaluated at execution and so always fresh; group versions leave the guard check, and `groupVersion` stays as a view for readers.
+24. The guard proof is on the ledger (3.2, 3.3). `Guard.proof` carries the proof's bytes, and after a guarded update the contract emits `GuardProof(registryId, version, policyId, proof)`; `guardDigest = keccak256(policyId, keccak256(proof))` stays in `Issued` and `Revoked`. Anyone can check the proof afterwards. The implementation sends the presentation as UTF-8 JSON and re-verifies it from the event.
+25. One status atom (3.5, `lem:atom-classes`). Every domain holds issued IDs only (Issued by definition, Presented by the signature, groups by 21), so on every domain `Issued(x)` is true, `NotIssued(x)` is false and `Active(x)` is `NotRevoked(x)`. The front end desugars them away and folds the constants this leaves. The atom table of `lem:atom-classes` keeps `Revoked` and `NotRevoked` only, and 15 should present `Active(x)` as sugar for `NotRevoked(x)`.

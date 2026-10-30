@@ -9,7 +9,7 @@ import { ethers } from 'ethers';
 import { deployAll, revertName, type Deployment } from '../../src/chain/client.ts';
 import { connectLive, type LiveTarget } from '../../src/chain/live.ts';
 import { Issuer, Holder, Verifier, type PolicyRef } from '../../src/actors/actors.ts';
-import type { Analysis, Binding, Presentation } from '../../src/ql/compile.ts';
+import type { Binding, Presentation } from '../../src/ql/compile.ts';
 
 const RPC = process.env.RPC ?? 'http://127.0.0.1:8545';
 // anvil's first default account (a public test key): deploys the contracts and nothing else
@@ -70,7 +70,8 @@ export class ReservationWorld extends World {
   readonly outcomes: Outcome[] = [];
   lastProof?: Proof;
   lastVerify?: Awaited<ReturnType<Verifier['verify']>>;
-  analysis?: Analysis;
+  /** what compiling a query for the chain threw, if anything */
+  compileError?: unknown;
   label = '';
 
   constructor(options: IWorldOptions) { super(options); }
@@ -109,9 +110,14 @@ export class ReservationWorld extends World {
     return g;
   }
 
-  /** bindings every query of the flat reservation may use */
+  /** bindings every query of the flat reservation may use: the group, the CredDef, and its registry by two names */
   bindings(): [string, Binding][] {
-    return [['S', this.group('S')], ['Landlord', { kind: 'creddef', credDefId: this.landlord.credDefId }]];
+    return [
+      ['S', this.group('S')],
+      ['Landlord', { kind: 'creddef', credDefId: this.landlord.credDefId }],
+      ['Interest', { kind: 'registry', registryId: this.registryId }],
+      ['Issued', { kind: 'registry', registryId: this.registryId }],
+    ];
   }
 }
 
