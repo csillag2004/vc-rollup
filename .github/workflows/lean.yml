@@ -1,0 +1,36 @@
+name: Lean model
+
+permissions: {}
+
+on:
+  push:
+    paths:
+      - "verification/lean/**"
+      - ".github/workflows/lean.yml"
+  pull_request:
+    paths:
+      - "verification/lean/**"
+      - ".github/workflows/lean.yml"
+  workflow_dispatch:
+
+jobs:
+  lake-build:
+    name: Seal check and lake build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: verification/lean
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Install pinned Lean toolchain
+        run: |
+          bash scripts/setup-toolchain.sh
+          echo "$PWD/tools/lean-4.23.0/bin" >> "$GITHUB_PATH"
+
+      - name: Check seal, forbidden mechanisms, lake build, axioms
+        run: bash scripts/check.sh

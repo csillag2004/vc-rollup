@@ -1,0 +1,11 @@
+name = "lifecycle"
+defaultTargets = ["Lifecycle"]
+
+[leanOptions]
+autoImplicit = false
+relaxedAutoImplicit = false
+
+[[lean_lib]]
+name = "Lifecycle"
+roots = ["Model", "Lifecycle.Registry", "Lifecycle.Formulas", "Lifecycle.Vdr",
+  "Lifecycle.Claims", "Lifecycle.Witnesses", "Lifecycle.Necessity", "Audit"]
