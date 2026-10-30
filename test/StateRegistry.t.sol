@@ -88,23 +88,18 @@ contract StateRegistryTest is Test {
         }
     }
 
-    function _issueStep(uint256 y) internal view returns (StateRegistry.IssueStep memory s) {
+    function _issueValues(uint256 y) internal view returns (bytes memory newI, bytes memory newW) {
         uint256 f = addmod(y, ALPHA, BLS.R);
-        s.newI = BLS.g1Mul(curI, f);
-        s.newWIR = BLS.g1Mul(curW, f);
-        s.T = BLS.g1Mul(curI, y);
-        uint256 k = 0xbeef + y;
-        s.R = BLS.g1Mul(curI, k);
-        uint256 c = registry.issueChallenge(regId, s.newI, s.T, s.R);
-        s.z = addmod(k, mulmod(c, y, BLS.R), BLS.R);
+        newI = BLS.g1Mul(curI, f);
+        newW = BLS.g1Mul(curW, f);
     }
 
     function _issue(uint256 y) internal {
-        StateRegistry.IssueStep memory s = _issueStep(y);
+        (bytes memory i, bytes memory w) = _issueValues(y);
         vm.prank(alice);
-        registry.issueUpdate(regId, s);
-        curI = s.newI;
-        curW = s.newWIR;
+        registry.issueUpdate(regId, bytes32(y), i, w);
+        curI = i;
+        curW = w;
         issuedYs.push(y);
     }
 
@@ -129,17 +124,9 @@ contract StateRegistryTest is Test {
         m[1] = bytes32(b);
     }
 
-    function _groupWitness(bytes32[] memory members) internal view returns (bytes memory) {
-        uint256 p = 1;
-        for (uint256 i = 0; i < members.length; i++) p = mulmod(p, addmod(uint256(members[i]), ALPHA, BLS.R), BLS.R);
-        return BLS.g1Mul(curI, BLS.frInv(p));
-    }
-
     function _createGroup(bytes32 label, bytes32[] memory members) internal returns (bytes32) {
-        (, bytes[] memory p2) = _srs(SRS_DEGREE);
-        bytes memory ws = _groupWitness(members);
         vm.prank(alice);
-        return registry.createGroup(regId, label, members, ws, p2);
+        return registry.createGroup(regId, label, members);
     }
 
     // ------------------------------------------------------------ BLS könyvtár
@@ -225,30 +212,72 @@ contract StateRegistryTest is Test {
         assertEq(registry.valuesHashAt(regId, 1), keccak256(abi.encode(curA, curR, curI)));
     }
 
-    function test_issueWrongSchnorrReverts() public {
-        StateRegistry.IssueStep memory s = _issueStep(Y1);
-        s.z = addmod(s.z, 1, BLS.R);
+    /// a kiadás nyilvános: az y a tárolóban és az eseményben is látszik
+    function test_issueRevealsY() public {
+        (bytes memory i, bytes memory w) = _issueValues(Y1);
+        vm.expectEmit(true, true, true, true);
+        emit StateRegistry.Issued(regId, 1, bytes32(Y1), i, w, bytes32(0));
         vm.prank(alice);
-        vm.expectRevert(StateRegistry.IssueProofFailed.selector);
-        registry.issueUpdate(regId, s);
+        registry.issueUpdate(regId, bytes32(Y1), i, w);
+        assertTrue(registry.isIssued(regId, bytes32(Y1)));
+        assertEq(registry.issuedAt(regId, bytes32(Y1)), 1);
+        assertEq(registry.issuedCount(regId), 1);
+        bytes32[] memory log = registry.getIssuedLog(regId, 0, 10);
+        assertEq(log.length, 1);
+        assertEq(log[0], bytes32(Y1));
+    }
+
+    function test_issueTwiceReverts() public {
+        _issue(Y1);
+        (bytes memory i, bytes memory w) = _issueValues(Y1);
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(StateRegistry.AlreadyIssued.selector, bytes32(Y1)));
+        registry.issueUpdate(regId, bytes32(Y1), i, w);
+    }
+
+    function test_issueZeroIdReverts() public {
+        vm.prank(alice);
+        vm.expectRevert(StateRegistry.EmptyRevocationId.selector);
+        registry.issueUpdate(regId, bytes32(0), curI, curW);
+    }
+
+    function test_issueOutOfFieldReverts() public {
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(StateRegistry.RevocationIdOutOfField.selector, bytes32(BLS.R)));
+        registry.issueUpdate(regId, bytes32(BLS.R), curI, curW);
+    }
+
+    /// y = −α esetén I' = I^0 a végtelen távoli pont: elutasítjuk (és egy ilyen y α-t is felfedné)
+    function test_issueMinusAlphaReverts() public {
+        uint256 y = BLS.R - ALPHA;
+        (bytes memory i, bytes memory w) = _issueValues(y);
+        assertTrue(BLS.isZero(i));
+        vm.prank(alice);
+        vm.expectRevert(StateRegistry.InvalidPoint.selector);
+        registry.issueUpdate(regId, bytes32(y), i, w);
     }
 
     function test_issueWrongStepReverts() public {
-        StateRegistry.IssueStep memory s = _issueStep(Y1);
-        s.newI = BLS.g1Mul(curI, addmod(Y1, ALPHA + 1, BLS.R)); // két tényező helyett más
-        s.R = BLS.g1Mul(curI, 0xbeef + Y1);
-        uint256 c = registry.issueChallenge(regId, s.newI, s.T, s.R);
-        s.z = addmod(0xbeef + Y1, mulmod(c, Y1, BLS.R), BLS.R);
+        (, bytes memory w) = _issueValues(Y1);
+        bytes memory bad = BLS.g1Mul(curI, addmod(Y1, ALPHA + 1, BLS.R)); // más tényező
         vm.prank(alice);
         vm.expectRevert(StateRegistry.StepCheckFailed.selector);
-        registry.issueUpdate(regId, s);
+        registry.issueUpdate(regId, bytes32(Y1), bad, w);
+    }
+
+    function test_issueWrongWIRReverts() public {
+        (bytes memory i,) = _issueValues(Y1);
+        bytes memory bad = BLS.g1Mul(curW, 7);
+        vm.prank(alice);
+        vm.expectRevert(StateRegistry.SubsetCheckFailed.selector);
+        registry.issueUpdate(regId, bytes32(Y1), i, bad);
     }
 
     function test_issueOnlyIssuer() public {
-        StateRegistry.IssueStep memory s = _issueStep(Y1);
+        (bytes memory i, bytes memory w) = _issueValues(Y1);
         vm.prank(bob);
         vm.expectRevert(abi.encodeWithSelector(StateRegistry.NotIssuer.selector, credDefId, bob));
-        registry.issueUpdate(regId, s);
+        registry.issueUpdate(regId, bytes32(Y1), i, w);
     }
 
     // ------------------------------------------------------------ visszavonás
@@ -320,6 +349,37 @@ contract StateRegistryTest is Test {
         registry.revoke(regId, bytes32(BLS.R), curA, curR, curW);
     }
 
+    function test_revokeNotIssuedReverts() public {
+        _issue(Y1);
+        (bytes memory a, bytes memory r, bytes memory w) = _revokeValues(Y2);
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(StateRegistry.NotIssued.selector, bytes32(Y2)));
+        registry.revoke(regId, bytes32(Y2), a, r, w);
+    }
+
+    /// A trapdoor birtokosa minden pairing-ellenőrzést kielégítő értékeket tud számolni egy soha ki nem adott
+    /// ID visszavonásához, a W_IR-t is: W_IR' = g^(P_Iss(α)/P_Rev'(α)). A visszavont ⊆ kiadott relációt
+    /// ezért a tároló köti, nem a (5) ellenőrzés.
+    function test_issuerWithAlphaCannotRevokeUnissued() public {
+        _issue(Y1);
+        uint256 f = addmod(Y2, ALPHA, BLS.R);
+        bytes memory a = BLS.g1Mul(curA, BLS.frInv(f));
+        bytes memory r = BLS.g2Mul(curR, f);
+        uint256 pIss = addmod(Y1, ALPHA, BLS.R);
+        bytes memory w = BLS.g1Mul(BLS.g1(), mulmod(pIss, BLS.frInv(f), BLS.R));
+        // mindhárom egyenlet teljesül
+        bytes[] memory ps = new bytes[](2);
+        uint256[] memory ss = new uint256[](2);
+        ps[0] = BLS.g2(); ss[0] = Y2;
+        ps[1] = BLS.g2Mul(BLS.g2(), ALPHA); ss[1] = 1;
+        assertTrue(BLS.pairingEq(a, BLS.g2Msm(ps, ss), curA, BLS.g2()));
+        assertTrue(BLS.pairingEq(a, r, _v0(), BLS.g2()));
+        assertTrue(BLS.pairingEq(w, r, curI, BLS.g2()));
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(StateRegistry.NotIssued.selector, bytes32(Y2)));
+        registry.revoke(regId, bytes32(Y2), a, r, w);
+    }
+
     // ------------------------------------------------------------ csoportok
 
     function test_createGroupOfIssued() public {
@@ -336,33 +396,39 @@ contract StateRegistryTest is Test {
         assertEq(registry.groupVersion(g), 1);
     }
 
-    /// A tanú α nélkül csak a kiadott halmaz ismeretében számolható; rossz tanúval nincs csoport.
-    /// (α birtokában bármely halmazhoz van tanú: tisztességes issuer mellett köt, mint minden α-beli ellenőrzés.)
-    function test_createGroupWrongWitnessReverts() public {
+    /// csak kiadott ID lehet tag: ezt a tároló dönti el, így az α birtokosát is köti
+    function test_createGroupMemberNotIssuedReverts() public {
         _issue(Y1);
         _issue(Y2);
-        _issue(Y3);
-        bytes memory ws = _groupWitness(_members(Y1, Y2));
-        (, bytes[] memory p2) = _srs(SRS_DEGREE);
         vm.prank(alice);
-        vm.expectRevert(StateRegistry.GroupSubsetCheckFailed.selector);
-        registry.createGroup(regId, LABEL, _members(Y1, Y3), ws, p2);
+        vm.expectRevert(abi.encodeWithSelector(StateRegistry.MemberNotIssued.selector, bytes32(Y3)));
+        registry.createGroup(regId, LABEL, _members(Y1, Y3));
+    }
+
+    /// csoportot bárki létrehozhat, például a verifier
+    function test_createGroupByAnyone() public {
+        _issue(Y1);
+        _issue(Y2);
+        vm.prank(bob);
+        bytes32 g = registry.createGroup(regId, LABEL, _members(Y1, Y2));
+        (, address creator,,) = registry.getGroup(g);
+        assertEq(creator, bob);
     }
 
     function test_createGroupUnsortedReverts() public {
-        (, bytes[] memory p2) = _srs(SRS_DEGREE);
+        _issue(Y1);
+        _issue(Y2);
         vm.prank(alice);
         vm.expectRevert(abi.encodeWithSelector(StateRegistry.MembersNotSorted.selector, 1));
-        registry.createGroup(regId, LABEL, _members(Y2, Y1), curI, p2);
+        registry.createGroup(regId, LABEL, _members(Y2, Y1));
     }
 
     function test_createGroupTooLargeReverts() public {
-        (, bytes[] memory p2) = _srs(SRS_DEGREE);
         bytes32[] memory m = new bytes32[](5);
         for (uint256 i = 0; i < 5; i++) m[i] = bytes32(i + 1);
         vm.prank(alice);
         vm.expectRevert(abi.encodeWithSelector(StateRegistry.GroupTooLarge.selector, 5, SRS_DEGREE));
-        registry.createGroup(regId, LABEL, m, curI, p2);
+        registry.createGroup(regId, LABEL, m);
     }
 
     // ------------------------------------------------------------ policy-k és guardolt frissítés
@@ -489,12 +555,12 @@ contract StateRegistryTest is Test {
         vm.prank(alice);
         policies.bindPolicy(credDefId, PolicyRegistry.Action.Issue, p);
 
-        StateRegistry.IssueStep memory s = _issueStep(Y3);
+        (bytes memory i, bytes memory w) = _issueValues(Y3);
         vm.prank(alice);
         vm.expectRevert(abi.encodeWithSelector(StateRegistry.PolicyRequired.selector, p));
-        registry.issueUpdate(regId, s);
+        registry.issueUpdate(regId, bytes32(Y3), i, w);
         vm.prank(alice);
-        registry.guardedIssueUpdate(regId, s, _guard(p, 0));
+        registry.guardedIssueUpdate(regId, bytes32(Y3), i, w, _guard(p, 0));
     }
 
     function testFuzz_nonIssuerCannotRevoke(address caller) public {
