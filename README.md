@@ -1,66 +1,40 @@
-## Foundry
+# vc-rollup: TDK reference implementation
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+A credential query language over AnonCreds-v2-style credentials (BBS signatures), a three-accumulator
+registry (A, R̃, I) on an EVM chain with EIP-2537 (OP Stack), and atomic guarded updates by
+compare-and-swap. Design and decisions: [`design/PLAN.md`](design/PLAN.md); results:
+[`design/EVALUATION.md`](design/EVALUATION.md); what the thesis text needs: [`design/THESIS-CHANGES.md`](design/THESIS-CHANGES.md).
 
-Foundry consists of:
+## Layout
 
-- **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
-- **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
-- **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
-- **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+| Path | What |
+|---|---|
+| `src/StateRegistry.sol` | A, R̃, I, W_IR, SRS, versions, groups; every update checked with pairings (verify on write) |
+| `src/PolicyRegistry.sol` | policies (query + bindings), CredDef rules for issue / revoke / present |
+| `src/lib/BLS.sol` | EIP-2537 wrappers |
+| `offchain/src/crypto` | BLS12-381 helpers, accumulators, BBS (IETF draft), sigma framework (AND, CDS threshold), leaves |
+| `offchain/src/ql` | parser, NNF, classification, compiler / prover / verifier, freshness, exhaustive check |
+| `offchain/src/chain`, `offchain/src/actors` | ethers client (history from events) and issuer / holder / verifier |
+| `offchain/eval` | flat reservation, classification, benchmarks, gas, report |
+| `offchain/features` | BDD scenarios (cucumber-js): flat reservation, verify on write, classification |
 
-## Documentation
-
-https://book.getfoundry.sh/
-
-## Usage
-
-### Build
+## Running
 
 ```shell
-$ forge build
+cd offchain && npm install && cd ..
+forge build                       # without a downloadable native solc: forge build --use ./tools/solc
+forge test                        # 88 tests, real pairings via the Prague precompiles
+cd offchain && npm test           # off-chain tests
+anvil --hardfork prague &         # local chain with EIP-2537
+npm run demo                      # flat reservation end to end
+npm run bdd                       # Gherkin scenarios (offchain/features) on the local chain
+npm run bdd:op-sepolia            # the same scenarios on OP Sepolia (deployed contracts, PRIVATE_KEY in .env)
+npm run eval:report               # regenerates design/EVALUATION.md
 ```
 
-### Test
+Deployed on OP Sepolia: addresses in [`design/DEPLOYMENTS.md`](design/DEPLOYMENTS.md). To deploy again (the script
+first probes the BLS12-381 pairing precompile):
 
 ```shell
-$ forge test
-```
-
-### Format
-
-```shell
-$ forge fmt
-```
-
-### Gas Snapshots
-
-```shell
-$ forge snapshot
-```
-
-### Anvil
-
-```shell
-$ anvil
-```
-
-### Deploy
-
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
-
-### Cast
-
-```shell
-$ cast <subcommand>
-```
-
-### Help
-
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
+forge script script/Deploy.s.sol --rpc-url op_sepolia --private-key $PRIVATE_KEY --broadcast
 ```

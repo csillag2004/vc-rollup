@@ -1,0 +1,533 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.24;
+
+import {CredDefRegistry, IEthereumDIDRegistry} from "./CredDefRegistry.sol";
+import {PolicyRegistry} from "./PolicyRegistry.sol";
+import {BLS} from "./lib/BLS.sol";
+
+/// Három akkumulátoros állapotregiszter (A, R̃, I) CredDef-partíciónként.
+/// Verify on write: minden frissítést a contract EIP-2537 pairinggel ellenőriz,
+/// a guardolt frissítéseknél pedig a policy szerinti compare-and-swap fut.
+contract StateRegistry {
+
+    struct Registry {
+        bytes32 credDefId;
+        bytes32 label;
+        bytes A;        // aktív oldal, G1: V0^(1/P_Rev(α)) (static add)
+        bytes Rtilde;   // visszavont halmaz, G2: g̃^(P_Rev(α))
+        bytes I;        // kiadott halmaz, G1: g^(P_Iss(α))
+        bytes V0;       // A kezdőértéke, G1
+        bytes Qtilde;   // akkumulátor kulcs, G2: g̃^α
+        bytes Q;        // akkumulátor kulcs, G1: g^α
+        bytes WIR;      // R̃ ⊆ I tanú, G1: g^(P_Iss/P_Rev(α))
+        uint64 version;
+        bytes32 g1SrsHash;
+        bytes32 g2SrsHash;
+        uint32 srsDegree;
+        uint256 createdAt;
+    }
+
+    struct Group {
+        bytes32 registryId;
+        address creator;
+        bytes32[] members;
+        uint256 createdAt;
+    }
+
+    /// kiadási lépés: az y titkos marad, T = I^y és Schnorr-bizonyítás (R, z) arról, hogy ismert
+    struct IssueStep {
+        bytes newI;
+        bytes newWIR;
+        bytes T;
+        bytes R;
+        uint256 z;
+    }
+
+    /// guard: melyik policy alapján, a kötések szerinti várt verziók, és a bizonyítás hash-e
+    struct Guard {
+        bytes32 policyId;
+        uint64[] expectedVersions;
+        bytes32 proofHash;
+    }
+
+    CredDefRegistry public immutable credDefRegistry;
+    IEthereumDIDRegistry public immutable didRegistry;
+    PolicyRegistry public immutable policyRegistry;
+
+    mapping(bytes32 registryId => Registry) private registries;
+    mapping(bytes32 credDefId => bytes32[]) private registriesOfCredDef;
+    mapping(bytes32 registryId => mapping(uint64 version => bytes32)) private valuesHashes;      // keccak(A, R̃, I)
+    mapping(bytes32 registryId => mapping(bytes32 y => uint64)) private revokedAtVersion;        // 0 = nincs visszavonva
+    mapping(bytes32 registryId => bytes32[]) private revokedLog;                                  // append-only
+    mapping(bytes32 groupId => Group) private groups;
+
+    event RegistryCreated(bytes32 indexed registryId, bytes32 indexed credDefId, bytes32 label, bytes V0, bytes Qtilde, bytes Q);
+    event SrsPublished(bytes32 indexed registryId, uint32 degree, bytes[] g1Powers, bytes[] g2Powers);
+    // guardDigest = 0 a nem őrzött frissítésnél; egyébként keccak256(abi.encode(policyId, proofHash))
+    event Issued(bytes32 indexed registryId, uint64 indexed version, bytes newI, bytes newWIR, bytes32 guardDigest);
+    event Revoked(bytes32 indexed registryId, uint64 indexed version, bytes32 indexed y, bytes newA, bytes newRtilde, bytes newWIR, bytes32 guardDigest);
+    event GroupCreated(bytes32 indexed groupId, bytes32 indexed registryId, address indexed creator, bytes32 label, bytes32[] members);
+
+    error ZeroAddress();
+    error UnknownCredDef(bytes32 credDefId);
+    error UnknownRegistry(bytes32 registryId);
+    error RegistryExists(bytes32 registryId);
+    error NotIssuer(bytes32 credDefId, address caller);
+    error EmptyRevocationId();
+    error RevocationIdOutOfField(bytes32 y);
+    error AlreadyRevoked(bytes32 y);
+    error KeyMismatch();
+    error InvalidPoint();
+    error StepCheckFailed();
+    error ConsistencyCheckFailed();
+    error SubsetCheckFailed();
+    error IssueProofFailed();
+    error StaleVersion(uint256 index, uint64 expected, uint64 current);
+    error StaleGroupVersion(bytes32 groupId, uint64 expected, uint64 current);
+    error PolicyRequired(bytes32 policyId);
+    error WrongPolicy(bytes32 expected, bytes32 given);
+    error GuardLengthMismatch(uint256 bindings, uint256 versions);
+    error UnknownGroup(bytes32 groupId);
+    error GroupExists(bytes32 groupId);
+    error EmptyGroup();
+    error MembersNotSorted(uint256 index);
+    error GroupTooLarge(uint256 size, uint32 srsDegree);
+    error GroupSubsetCheckFailed();
+    error IndexOutOfRange(uint256 index);
+    error SrsAlreadyPublished();
+    error SrsNotPublished();
+    error BadSrsLength(uint256 g1Count, uint256 g2Count);
+    error SrsMismatch(uint256 index);
+    error SrsStructureInvalid();
+
+    constructor(address _credDefRegistry, address _policyRegistry) {
+        if (_credDefRegistry == address(0) || _policyRegistry == address(0)) revert ZeroAddress();
+        credDefRegistry = CredDefRegistry(_credDefRegistry);
+        // ugyanazt a DID registryt használjuk, mint a CredDefRegistry, így nem csúszhat szét a kettő
+        didRegistry = CredDefRegistry(_credDefRegistry).didRegistry();
+        policyRegistry = PolicyRegistry(_policyRegistry);
+    }
+
+    modifier onlyIssuer(bytes32 registryId) {
+        _requireIssuer(_credDefOf(registryId));
+        _;
+    }
+
+    modifier whenInitialized(bytes32 registryId) {
+        if (registries[registryId].g1SrsHash == bytes32(0)) revert SrsNotPublished();
+        _;
+    }
+
+
+    ///LÉTREHOZÁS
+    function createRegistry(
+        bytes32 credDefId,
+        bytes32 label,
+        bytes calldata V0,
+        bytes calldata Qtilde,
+        bytes calldata Q
+    ) external returns (bytes32 registryId) {
+        _requireIssuer(credDefId);
+        registryId = keccak256(abi.encode(credDefId, label));
+        Registry storage r = registries[registryId];
+        if (r.createdAt != 0) revert RegistryExists(registryId);
+
+        BLS.checkG1(V0);
+        BLS.checkG2(Qtilde);
+        BLS.checkG1(Q);
+        if (BLS.isZero(V0) || BLS.isZero(Q)) revert InvalidPoint();
+        // a két kulcs ugyanaz az α: e(Q, g̃) = e(g, Q̃); a pairing a részcsoport-tagságot is ellenőrzi
+        if (!BLS.pairingEq(Q, BLS.g2(), BLS.g1(), Qtilde)) revert KeyMismatch();
+        BLS.g1Mul(V0, 1); // V0 a G1 részcsoportban van (különben az MSM revertál)
+
+        r.credDefId = credDefId;
+        r.label = label;
+        r.V0 = V0;
+        r.Qtilde = Qtilde;
+        r.Q = Q;
+        r.A = V0;
+        r.Rtilde = BLS.g2();
+        r.I = BLS.g1();
+        r.WIR = BLS.g1();
+        r.createdAt = block.timestamp;
+        valuesHashes[registryId][0] = _valuesHash(r);
+        registriesOfCredDef[credDefId].push(registryId);
+
+        emit RegistryCreated(registryId, credDefId, label, V0, Qtilde, Q);
+    }
+
+    /// SRS: g^(α^i) és g̃^(α^i), i = 0..n. Szerkezetét két kötegelt pairing ellenőrzi:
+    /// e(Σρ_i·g1[i+1], g̃) = e(Σρ_i·g1[i], Q̃) és e(Σρ_i·g1[i], g̃) = e(g, Σρ_i·g2[i]).
+    function publishSrs(bytes32 registryId, bytes[] calldata g1Powers, bytes[] calldata g2Powers)
+        external onlyIssuer(registryId)
+    {
+        Registry storage r = registries[registryId];
+        if (r.g1SrsHash != bytes32(0)) revert SrsAlreadyPublished();
+        uint256 len = g2Powers.length;
+        if (len < 2 || g1Powers.length != len) revert BadSrsLength(g1Powers.length, len);
+        for (uint256 i = 0; i < len; i++) {
+            BLS.checkG1(g1Powers[i]);
+            BLS.checkG2(g2Powers[i]);
+        }
+        if (keccak256(g1Powers[0]) != keccak256(BLS.g1())) revert SrsMismatch(0);
+        if (keccak256(g2Powers[0]) != keccak256(BLS.g2())) revert SrsMismatch(0);
+        if (keccak256(g2Powers[1]) != keccak256(r.Qtilde)) revert SrsMismatch(1);
+        if (keccak256(g1Powers[1]) != keccak256(r.Q)) revert SrsMismatch(1);
+
+        bytes32 g1Hash = keccak256(abi.encode(g1Powers));
+        bytes32 g2Hash = keccak256(abi.encode(g2Powers));
+        _checkSrsStructure(g1Powers, g2Powers, r.Qtilde, keccak256(abi.encode(g1Hash, g2Hash)));
+
+        r.g1SrsHash = g1Hash;
+        r.g2SrsHash = g2Hash;
+        r.srsDegree = uint32(len - 1);
+        emit SrsPublished(registryId, r.srsDegree, g1Powers, g2Powers);
+    }
+
+
+    ///KIADÁS
+    function issueUpdate(bytes32 registryId, IssueStep calldata step)
+        external onlyIssuer(registryId) whenInitialized(registryId)
+    {
+        bytes32 credDefId = registries[registryId].credDefId;
+        bytes32 bound = policyRegistry.boundPolicy(credDefId, PolicyRegistry.Action.Issue);
+        if (bound != bytes32(0)) revert PolicyRequired(bound);
+        _applyIssue(registryId, step, bytes32(0));
+    }
+
+    function guardedIssueUpdate(bytes32 registryId, IssueStep calldata step, Guard calldata guard)
+        external onlyIssuer(registryId) whenInitialized(registryId)
+    {
+        bytes32 digest = _checkGuard(registries[registryId].credDefId, PolicyRegistry.Action.Issue, guard);
+        _applyIssue(registryId, step, digest);
+    }
+
+
+    ///VISSZAVONÁS
+    function revoke(
+        bytes32 registryId,
+        bytes32 y,
+        bytes calldata newA,
+        bytes calldata newRtilde,
+        bytes calldata newWIR
+    ) external onlyIssuer(registryId) {
+        bytes32 credDefId = registries[registryId].credDefId;
+        bytes32 bound = policyRegistry.boundPolicy(credDefId, PolicyRegistry.Action.Revoke);
+        if (bound != bytes32(0)) revert PolicyRequired(bound);
+        _applyRevoke(registryId, y, newA, newRtilde, newWIR, bytes32(0));
+    }
+
+    function guardedRevoke(
+        bytes32 registryId,
+        bytes32 y,
+        bytes calldata newA,
+        bytes calldata newRtilde,
+        bytes calldata newWIR,
+        Guard calldata guard
+    ) external onlyIssuer(registryId) {
+        bytes32 digest = _checkGuard(registries[registryId].credDefId, PolicyRegistry.Action.Revoke, guard);
+        _applyRevoke(registryId, y, newA, newRtilde, newWIR, digest);
+    }
+
+
+    ///CSOPORTOK
+    /// Csak kiadott ID-k: e(W_S, [P_S]_2) = e(I, g̃), ahol [P_S]_2-t a contract számolja a tagokból és a G2 SRS-ből.
+    function createGroup(
+        bytes32 registryId,
+        bytes32 label,
+        bytes32[] calldata members,
+        bytes calldata WS,
+        bytes[] calldata g2Powers
+    ) external whenInitialized(registryId) returns (bytes32 groupId) {
+        Registry storage r = registries[registryId];
+        uint32 degree = r.srsDegree;
+        if (members.length == 0) revert EmptyGroup();
+        if (members.length > degree) revert GroupTooLarge(members.length, degree);
+        if (members[0] == bytes32(0)) revert EmptyRevocationId();
+        for (uint256 i = 0; i < members.length; i++) {
+            if (uint256(members[i]) >= BLS.R) revert RevocationIdOutOfField(members[i]);
+            if (i > 0 && members[i] <= members[i - 1]) revert MembersNotSorted(i);
+        }
+        if (keccak256(abi.encode(g2Powers)) != r.g2SrsHash) revert SrsMismatch(0);
+
+        groupId = keccak256(abi.encode(registryId, msg.sender, label));
+        Group storage g = groups[groupId];
+        if (g.createdAt != 0) revert GroupExists(groupId);
+
+        BLS.checkG1(WS);
+        if (!BLS.pairingEq(WS, _groupPolyG2(members, g2Powers), r.I, BLS.g2())) revert GroupSubsetCheckFailed();
+
+        g.registryId = registryId;
+        g.creator = msg.sender;
+        g.createdAt = block.timestamp;
+        g.members = members;
+
+        emit GroupCreated(groupId, registryId, msg.sender, label, members);
+    }
+
+    /// a csoport visszavont tagjainak száma; mivel a tagok kiadottak, csak visszavonás érintheti őket
+    function groupVersion(bytes32 groupId) public view returns (uint64 v) {
+        Group storage g = groups[groupId];
+        if (g.createdAt == 0) revert UnknownGroup(groupId);
+        bytes32[] storage m = g.members;
+        mapping(bytes32 => uint64) storage revokedIn = revokedAtVersion[g.registryId];
+        for (uint256 i = 0; i < m.length; i++) {
+            if (revokedIn[m[i]] != 0) v++;
+        }
+    }
+
+
+    ///OLVASÓ FÜGGVÉNYEK
+    function getRegistry(bytes32 registryId) external view returns (Registry memory) {
+        if (registries[registryId].createdAt == 0) revert UnknownRegistry(registryId);
+        return registries[registryId];
+    }
+
+    function exists(bytes32 registryId) external view returns (bool) {
+        return registries[registryId].createdAt != 0;
+    }
+
+    /// Egy CredDef összes partíciója, létrehozási sorrendben.
+    function registriesOf(bytes32 credDefId) external view returns (bytes32[] memory) {
+        return registriesOfCredDef[credDefId];
+    }
+
+    function registryIdOf(bytes32 credDefId, bytes32 label) external pure returns (bytes32) {
+        return keccak256(abi.encode(credDefId, label));
+    }
+
+    /// Az állapot és a version, amire egy proof köthető.
+    function getValues(bytes32 registryId)
+        external view
+        returns (bytes memory A, bytes memory Rtilde, bytes memory I, bytes memory WIR, uint64 version)
+    {
+        Registry storage r = registries[registryId];
+        if (r.createdAt == 0) revert UnknownRegistry(registryId);
+        return (r.A, r.Rtilde, r.I, r.WIR, r.version);
+    }
+
+    /// Történeti érték hitelesítése: keccak256(abi.encode(A, Rtilde, I)); jövőbeli versionre 0.
+    function valuesHashAt(bytes32 registryId, uint64 version) external view returns (bytes32) {
+        return valuesHashes[registryId][version];
+    }
+
+    function isRevoked(bytes32 registryId, bytes32 y) external view returns (bool) {
+        return revokedAtVersion[registryId][y] != 0;
+    }
+
+    /// Melyik versionnél került y R̃-ba (0 = nincs visszavonva). A free receipt a közvetlenül előtte lévő R̃.
+    function revokedAt(bytes32 registryId, bytes32 y) external view returns (uint64) {
+        return revokedAtVersion[registryId][y];
+    }
+
+    function revokedCount(bytes32 registryId) external view returns (uint256) {
+        return revokedLog[registryId].length;
+    }
+
+    /// Lapozható olvasás a holderek receipt-frissítéséhez.
+    function getRevokedLog(bytes32 registryId, uint256 start, uint256 count) external view returns (bytes32[] memory out) {
+        bytes32[] storage log = revokedLog[registryId];
+        if (start > log.length) revert IndexOutOfRange(start);
+        uint256 end = start + count > log.length ? log.length : start + count;
+        out = new bytes32[](end - start);
+        for (uint256 i = start; i < end; i++) out[i - start] = log[i];
+    }
+
+    function getGroup(bytes32 groupId)
+        external view
+        returns (bytes32 registryId, address creator, uint256 createdAt, bytes32[] memory members)
+    {
+        Group storage g = groups[groupId];
+        if (g.createdAt == 0) revert UnknownGroup(groupId);
+        return (g.registryId, g.creator, g.createdAt, g.members);
+    }
+
+    /// A tagok rendezettek, ezért bináris kereséssel.
+    function isGroupMember(bytes32 groupId, bytes32 y) external view returns (bool) {
+        Group storage g = groups[groupId];
+        if (g.createdAt == 0) revert UnknownGroup(groupId);
+        bytes32[] storage m = g.members;
+        uint256 lo = 0;
+        uint256 hi = m.length;
+        while (lo < hi) {
+            uint256 mid = (lo + hi) / 2;
+            if (m[mid] == y) return true;
+            if (m[mid] < y) lo = mid + 1;
+            else hi = mid;
+        }
+        return false;
+    }
+
+    /// a kiadási Schnorr-bizonyítás kihívása; az off-chain kód ugyanezt számolja
+    function issueChallenge(bytes32 registryId, bytes calldata newI, bytes calldata T, bytes calldata R)
+        public view returns (uint256)
+    {
+        Registry storage r = registries[registryId];
+        return uint256(keccak256(abi.encode(
+            "revoq/issue/v1", block.chainid, address(this), registryId, r.version, r.I, newI, T, R
+        ))) % BLS.R;
+    }
+
+
+    ///SEGÉDFÜGGVÉNYEK
+    function _valuesHash(Registry storage r) private view returns (bytes32) {
+        return keccak256(abi.encode(r.A, r.Rtilde, r.I));
+    }
+
+    function _requireIssuer(bytes32 credDefId) private view {
+        if (!credDefRegistry.exists(credDefId)) revert UnknownCredDef(credDefId);
+        if (didRegistry.identityOwner(credDefRegistry.issuerOf(credDefId)) != msg.sender) {
+            revert NotIssuer(credDefId, msg.sender);
+        }
+    }
+
+    function _credDefOf(bytes32 registryId) private view returns (bytes32) {
+        Registry storage r = registries[registryId];
+        if (r.createdAt == 0) revert UnknownRegistry(registryId);
+        return r.credDefId;
+    }
+
+    /// Kiadás: I' = I^(y+α), W_IR' = W_IR^(y+α), y rejtve marad.
+    /// (1) Schnorr: I^z = R · T^c, (2) e(I' - T, g̃) = e(I, Q̃), (3) e(W_IR', R̃) = e(I', g̃).
+    function _applyIssue(bytes32 registryId, IssueStep calldata s, bytes32 guardDigest) private {
+        Registry storage r = registries[registryId];
+        BLS.checkG1(s.newI);
+        BLS.checkG1(s.newWIR);
+        BLS.checkG1(s.T);
+        BLS.checkG1(s.R);
+        if (BLS.isZero(s.T)) revert InvalidPoint();
+
+        uint256 c = issueChallenge(registryId, s.newI, s.T, s.R);
+        bytes[] memory ps = new bytes[](2);
+        uint256[] memory ss = new uint256[](2);
+        ps[0] = r.I; ss[0] = s.z % BLS.R;
+        ps[1] = s.T; ss[1] = BLS.R - c;
+        if (keccak256(BLS.g1Msm(ps, ss)) != keccak256(s.R)) revert IssueProofFailed();
+
+        bytes memory iMinusT = BLS.g1Add(s.newI, BLS.g1Neg(s.T));
+        if (!BLS.pairingEq(iMinusT, BLS.g2(), r.I, r.Qtilde)) revert StepCheckFailed();
+        if (!BLS.pairingEq(s.newWIR, r.Rtilde, s.newI, BLS.g2())) revert SubsetCheckFailed();
+
+        r.I = s.newI;
+        r.WIR = s.newWIR;
+        r.version += 1;                                  // a kiadás is új version
+        valuesHashes[registryId][r.version] = _valuesHash(r);
+        emit Issued(registryId, r.version, s.newI, s.newWIR, guardDigest);
+    }
+
+    /// Visszavonás: A' = A^(1/(y+α)), R̃' = R̃^(y+α), W_IR' = W_IR^(1/(y+α)).
+    /// Lépés: e(A', g̃^y·Q̃) = e(A, g̃); konzisztencia: e(A', R̃') = e(V0, g̃); részhalmaz: e(W_IR', R̃') = e(I, g̃).
+    /// A lépés-ellenőrzés egyben az értékek frissességét is garantálja: A' csak az aktuális A-ból léphet.
+    function _applyRevoke(
+        bytes32 registryId,
+        bytes32 y,
+        bytes calldata newA,
+        bytes calldata newRtilde,
+        bytes calldata newWIR,
+        bytes32 guardDigest
+    ) private {
+        if (y == bytes32(0)) revert EmptyRevocationId();
+        if (uint256(y) >= BLS.R) revert RevocationIdOutOfField(y);
+        if (revokedAtVersion[registryId][y] != 0) revert AlreadyRevoked(y);
+        BLS.checkG1(newA);
+        BLS.checkG2(newRtilde);
+        BLS.checkG1(newWIR);
+
+        Registry storage r = registries[registryId];
+        bytes[] memory ps = new bytes[](2);
+        uint256[] memory ss = new uint256[](2);
+        ps[0] = BLS.g2(); ss[0] = uint256(y);
+        ps[1] = r.Qtilde; ss[1] = 1;
+        bytes memory gyQ = BLS.g2Msm(ps, ss);
+
+        if (!BLS.pairingEq(newA, gyQ, r.A, BLS.g2())) revert StepCheckFailed();
+        if (!BLS.pairingEq(newA, newRtilde, r.V0, BLS.g2())) revert ConsistencyCheckFailed();
+        if (!BLS.pairingEq(newWIR, newRtilde, r.I, BLS.g2())) revert SubsetCheckFailed();
+
+        r.A = newA;
+        r.Rtilde = newRtilde;
+        r.WIR = newWIR;
+        r.version += 1;
+        valuesHashes[registryId][r.version] = _valuesHash(r);
+
+        revokedAtVersion[registryId][y] = r.version;
+        revokedLog[registryId].push(y);
+
+        emit Revoked(registryId, r.version, y, newA, newRtilde, newWIR, guardDigest);
+    }
+
+    /// Guard: ha a CredDef-hez az adott művelethez policy van kötve, csak az fogadható el.
+    /// A CAS-módot a policy adja: None = nincs összehasonlítás (stable guard),
+    /// Group = minden kötött csoport verziója, Global = minden kötött registry (vagy a csoport registryjének) verziója.
+    function _checkGuard(bytes32 credDefId, PolicyRegistry.Action action, Guard calldata guard)
+        private view returns (bytes32)
+    {
+        bytes32 bound = policyRegistry.boundPolicy(credDefId, action);
+        if (bound != bytes32(0) && bound != guard.policyId) revert WrongPolicy(bound, guard.policyId);
+        (PolicyRegistry.CasMode mode, PolicyRegistry.BindingKind[] memory kinds, bytes32[] memory targets) =
+            policyRegistry.guardInfo(guard.policyId);
+        if (guard.expectedVersions.length != targets.length) {
+            revert GuardLengthMismatch(targets.length, guard.expectedVersions.length);
+        }
+        if (mode != PolicyRegistry.CasMode.None) {
+            for (uint256 i = 0; i < targets.length; i++) {
+                if (kinds[i] == PolicyRegistry.BindingKind.CredDef) continue;
+                uint64 expected = guard.expectedVersions[i];
+                if (kinds[i] == PolicyRegistry.BindingKind.Group && mode == PolicyRegistry.CasMode.Group) {
+                    uint64 gv = groupVersion(targets[i]);
+                    if (gv != expected) revert StaleGroupVersion(targets[i], expected, gv);
+                } else {
+                    bytes32 regId = kinds[i] == PolicyRegistry.BindingKind.Group ? _groupRegistry(targets[i]) : targets[i];
+                    if (registries[regId].createdAt == 0) revert UnknownRegistry(regId);
+                    uint64 current = registries[regId].version;
+                    if (current != expected) revert StaleVersion(i, expected, current);
+                }
+            }
+        }
+        return keccak256(abi.encode(guard.policyId, guard.proofHash));
+    }
+
+    function _groupRegistry(bytes32 groupId) private view returns (bytes32) {
+        Group storage g = groups[groupId];
+        if (g.createdAt == 0) revert UnknownGroup(groupId);
+        return g.registryId;
+    }
+
+    /// [P_S]_2 = Σ c_j · g̃^(α^j)
+    function _groupPolyG2(bytes32[] calldata members, bytes[] calldata g2Powers) private view returns (bytes memory) {
+        uint256[] memory c = BLS.setPolyCoeffs(members);
+        bytes[] memory ps = new bytes[](c.length);
+        for (uint256 j = 0; j < c.length; j++) ps[j] = g2Powers[j];
+        return BLS.g2Msm(ps, c);
+    }
+
+    function _checkSrsStructure(bytes[] calldata g1p, bytes[] calldata g2p, bytes memory Qtilde, bytes32 seed)
+        private view
+    {
+        uint256 n = g1p.length; // n = fok + 1
+        bytes[] memory lowG1 = new bytes[](n - 1);
+        bytes[] memory highG1 = new bytes[](n - 1);
+        uint256[] memory rhoShift = new uint256[](n - 1);
+        bytes[] memory allG1 = new bytes[](n);
+        bytes[] memory allG2 = new bytes[](n);
+        uint256[] memory rho = new uint256[](n);
+        for (uint256 i = 0; i < n; i++) {
+            rho[i] = uint256(keccak256(abi.encode(seed, i))) % BLS.R;
+            allG1[i] = g1p[i];
+            allG2[i] = g2p[i];
+            if (i + 1 < n) {
+                lowG1[i] = g1p[i];
+                highG1[i] = g1p[i + 1];
+                rhoShift[i] = rho[i];
+            }
+        }
+        // egymást követő hatványok: Σρ_i·g1[i+1] = α·Σρ_i·g1[i]
+        if (!BLS.pairingEq(BLS.g1Msm(highG1, rhoShift), BLS.g2(), BLS.g1Msm(lowG1, rhoShift), Qtilde)) {
+            revert SrsStructureInvalid();
+        }
+        // a G2 hatványok ugyanazok: e(Σρ_i·g1[i], g̃) = e(g, Σρ_i·g2[i])
+        if (!BLS.pairingEq(BLS.g1Msm(allG1, rho), BLS.g2(), BLS.g1(), BLS.g2Msm(allG2, rho))) {
+            revert SrsStructureInvalid();
+        }
+    }
+}
