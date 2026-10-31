@@ -51,7 +51,7 @@ const start = performance.now();
 const elapsed = () => (performance.now() - start) / 1000;
 let transcript = '';
 function output(chunk, stderr = false) {
-  const text = chunk.toString();
+  const text = chunk.toString().replaceAll(root, '<repo>');
   (stderr ? process.stderr : process.stdout).write(text);
   record.push([elapsed(), 'o', text.replace(/\r?\n/g, '\r\n')]);
   transcript += text;

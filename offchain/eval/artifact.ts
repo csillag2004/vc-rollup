@@ -27,7 +27,7 @@ const report: string[] = ['# Local artifact results', '',
   'These runs do not establish security against a malicious issuer or on-chain guard truth.', ''];
 
 function write(name: string, text: string) {
-  fs.writeFileSync(path.join(out, name), text);
+  fs.writeFileSync(path.join(out, name), text.replaceAll(root, '<repo>'));
   outputs.push(name);
 }
 function csv(name: string, columns: string[], rows: unknown[][]) {
