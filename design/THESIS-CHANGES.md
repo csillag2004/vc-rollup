@@ -1,13 +1,15 @@
-# Thesis alignment for the reduced artifact
+# Thesis alignment for ledger-enforced public guards
 
-The current artifact follows [ARTIFACT-CONTRACT.md](ARTIFACT-CONTRACT.md), selected on 2026-10-31. The paper's title is *Joint anonymized issuance and revocation for complex verifiable credential chains*. This checklist records required alignment; it does not change the student's text.
+The current executable scope is [ENFORCED-GUARDS.md](ENFORCED-GUARDS.md). This checklist does not edit the student's paper. The earlier decision to use the reduced design has been superseded.
 
-- Describe BBS signatures, the prototype's composed sigma presentations, BLS12-381 and EIP-2537. State OP Stack/Prague execution assumptions and distinguish signature compatibility from presentation compatibility.
-- Use the static-add representation A = V0^(1/P_Rev(α)); issuance updates I and W_IR. Explain hidden-y issuance and its Schnorr step proof. Duplicate issuance and the issued status of a revoked ID rely on the trusted issuer.
-- Describe groups as intended subsets of issued IDs. The pairing subset test does not enforce that relation against the issuer holding α. Revocation publishes identifiers and storage rejects repeated visible revocations.
-- Describe policies as author-declared classes and CAS modes. Query semantics and guard proofs are checked off chain by the updater; the contract enforces policy binding and version comparisons. Remove claims of on-chain query evaluation, public issuance storage, compiler-checked on-chain classes or `GuardProof` events containing proof bytes.
-- State that the ledger stores a proof commitment. Proof recovery requires separate retention. CAS establishes freshness conditional on a correctly verified and classified guard, not guard truth itself.
-- Qualify privacy claims: issuance identifiers are hidden, while revocations and groups reveal identifiers; historical receipt versions and timing can leak information. Lean does not prove privacy or cryptographic security.
-- Separate the ideal Lean model from implementation enforcement. Exact set-relation checks and guard truth are model premises that the reduced implementation entrusts to the issuer/updater. Cite the frozen model and this gap together.
-- Populate the evaluation from recorded runs: naive/CAS race (`StaleGroupVersion`), bounded classification, proof cost, gas/calldata and robustness. Report revision, environment, parameters and repetitions. Keep historical OP Sepolia evidence separate. Do not transplant numbers from the stronger guard implementation.
-- Treat witness-refresh scaling and larger concurrency stress as optional experiments unless separately commissioned. Mark unsupported claims and missing measurements explicitly.
+- Describe public issuance IDs, unique issuance and issued-before-revocation checks. Structural storage checks, rather than issuer-known-trapdoor quotient witnesses, enforce lifecycle and group membership.
+- State the supported update language: public quantifiers/counting over fixed issued-only groups and registry Issued domains, combined by conjunction/disjunction. The registered validated program is authoritative. Descriptive query text is checked against it by clients, not parsed by Solidity.
+- Explain that public guards are evaluated against the current state atomically. The second reservation fails with GuardFalse, not a stale version error. Off-chain freshness checks remain meaningful for presentations.
+- State that a nonzero Issue/Revoke policy binding cannot be replaced or removed. This guarantee starts at binding. Initial policy selection, unrestricted prior actions, issuer censorship and transaction ordering remain outside the guarantee.
+- Private Presented clauses cannot authorize an update, even with a stable class or a proof included in calldata. The paper's private lease-issuance guard is not implemented. The current sigma status relations are forgeable by the accumulator trapdoor holder; their regression counterexample explains the fail-closed boundary.
+- GuardProof events retain proof bytes and update events commit to their digest. Public guard truth is established independently of those bytes. Emission is not proof verification and does not guarantee valid audit content from a malicious issuer.
+- Qualify privacy: issuance, groups and revocation expose IDs and timing. Off-chain presentations aim to hide the selected credential under stated cryptographic/trust assumptions; no composition/privacy theorem is supplied by Lean.
+- Use the current claim-to-evidence matrix for guarantees. Frozen Lean results prove an ideal set model; no Solidity refinement or compiler correctness theorem is claimed.
+- Populate evaluation from the new provenance and local outputs. Preserve the old reduced-design results as historical and distinguish historical OP Sepolia evidence from the new ABI. Do not transplant old gas numbers or claim full private-guard support.
+- Explain BBS signature-library reuse versus prototype sigma presentations, and separate Kamilla's implementation contributions from Martin's qlc/Lean work and AI assistance.
+- Witness-refresh scaling, larger contention workloads and a sound private ledger-membership proof remain future work. Live redeployment requires separate approval.

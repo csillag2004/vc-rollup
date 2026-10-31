@@ -1,12 +1,12 @@
-// Run after forge build against local Anvil: ANVIL_RPC=http://127.0.0.1:8545 node --test test/guards.integration.ts
+// Integration against the isolated local chain owned by scripts/run.mjs.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ethers } from 'ethers';
-import { deployAll, revertName } from '../src/chain/client.ts';
-import { Issuer, Holder, readGroup } from '../src/actors/actors.ts';
+import { deployAll, revertName, readHistory } from '../src/chain/client.ts';
+import { Issuer, Holder, Verifier, readGroup, ACTION } from '../src/actors/actors.ts';
 import type { Binding } from '../src/ql/compile.ts';
 
-test('issuer validates guard proofs and contract atomically rejects stale group/global versions', async () => {
+test('ledger enforces public truth, permanent policies and the private-guard boundary', async () => {
   const provider = new ethers.JsonRpcProvider(process.env.ANVIL_RPC ?? 'http://127.0.0.1:8545', undefined,
     { pollingInterval: 20, cacheTimeout: -1 });
   try {
@@ -14,50 +14,50 @@ test('issuer validates guard proofs and contract atomically rejects stale group/
     const d = await deployAll(signer);
     const issuer = new Issuer(signer, d);
     await issuer.setUp('guard-regression', ['name']);
-    const registry = await issuer.createRegistry('guard-regression', 4);
+    const registry = await issuer.createRegistry('guard-regression', 8);
     const alice = new Holder(d), bob = new Holder(d);
     alice.wallet.push(await issuer.issue(registry, ['Alice'], alice.linkSecret));
     bob.wallet.push(await issuer.issue(registry, ['Bob'], bob.linkSecret));
     const group = await issuer.createGroup(registry, 'S', [alice.wallet[0]!.scalars[0]!, bob.wallet[0]!.scalars[0]!]);
-    const groupBindings: [string, Binding][] = [['S', await readGroup(d, group)]];
-    const groupPolicy = await issuer.registerPolicy('forall x in S. NotRevoked(x)', groupBindings);
-    const groupProof = await alice.present(groupPolicy.query, groupBindings, 'group');
-    const falsePolicy = await issuer.registerPolicy('exists x in S. Revoked(x)', groupBindings);
-    const before = (await d.state.getValues!(registry)).version;
+    const bindings: [string, Binding][] = [['S', await readGroup(d, group)]];
+    const policy = await issuer.registerPolicy('forall x in S. NotRevoked(x)', bindings, 'revoke');
+    const proof = await alice.present(policy.query, bindings, 'group');
+    const falsePolicy = await issuer.registerPolicy('exists x in S. Revoked(x)', bindings);
     await assert.rejects(issuer.issue(registry, ['Rejected'], alice.linkSecret,
-      { policy: falsePolicy, presentation: { ...groupProof, query: falsePolicy.query } }), /query is false/);
-    assert.equal((await d.state.getValues!(registry)).version, before);
+      { policy: falsePolicy, presentation: { ...proof, query: falsePolicy.query } }), /query is false/);
+    await assert.rejects(issuer.guardFor({ ...policy, query: falsePolicy.query }, proof), /registered policy/);
+    await assert.rejects(d.policies.bindPolicy!(issuer.credDefId, ACTION.revoke, ethers.ZeroHash),
+      e => revertName(d, e) === 'PolicyLocked');
+    await assert.rejects(d.policies.bindPolicy!(issuer.credDefId, ACTION.revoke, falsePolicy.policyId),
+      e => revertName(d, e) === 'PolicyLocked');
 
-    // A successful guarded issue commits to exactly the proof bytes supplied off-chain.
-    const accepted = await issuer.issue(registry, ['Accepted'], alice.linkSecret, { policy: groupPolicy, presentation: groupProof });
-    const events = await d.state.queryFilter(d.state.filters.Issued!(registry));
-    const event = events.at(-1) as ethers.EventLog;
-    const expectedDigest = ethers.keccak256(ethers.AbiCoder.defaultAbiCoder().encode(['bytes32', 'bytes32'],
-      [groupPolicy.policyId, ethers.id(JSON.stringify(groupProof))]));
-    assert.equal(event.args.guardDigest, expectedDigest);
-    assert.notEqual(expectedDigest, ethers.keccak256(ethers.AbiCoder.defaultAbiCoder().encode(['bytes32', 'bytes32'],
-      [groupPolicy.policyId, ethers.id(JSON.stringify({ ...groupProof, nonce: 'changed' }))])));
+    const privateBindings: [string, Binding][] = [['R', { kind: 'registry', registryId: registry }]];
+    const privatePolicy = await issuer.registerPolicy('exists x in Presented. Sig(x, "R") & NotRevoked(x)', privateBindings);
+    await assert.rejects(d.policies.bindPolicy!(issuer.credDefId, ACTION.issue, privatePolicy.policyId),
+      e => revertName(d, e) === 'UnsupportedPrivateGuard');
+    const privateProof = await alice.present(privatePolicy.query, privateBindings, 'private');
+    await assert.rejects(issuer.issue(registry, ['Private'], alice.linkSecret,
+      { policy: privatePolicy, presentation: privateProof }), /private update guards are unsupported/);
 
-    const active = 'exists x in Presented. Sig(x, "Issuer") & NotRevoked(x)';
-    const registryBindings: [string, Binding][] = [['Issuer', { kind: 'registry', registryId: registry }]];
-    const activePolicy = await issuer.registerPolicy(active, registryBindings);
-    const activeProof = await alice.present(active, registryBindings, 'active');
-    await assert.rejects(issuer.issue(registry, ['Corrupt'], alice.linkSecret,
-      { policy: activePolicy, presentation: { ...activeProof, proof: null } }), /missing proof/);
-    await assert.rejects(issuer.guardedRevoke(registry, accepted.scalars[0]!, activePolicy,
-      { ...activeProof, query: groupPolicy.query }), /another query/);
-    const credBindings: [string, Binding][] = [['Issuer', { kind: 'creddef', credDefId: issuer.credDefId }]];
-    const uncoveredPolicy = await issuer.registerPolicy(active, credBindings);
-    const uncovered = await alice.present(active, credBindings, 'uncovered');
-    await assert.rejects(issuer.guardedRevoke(registry, accepted.scalars[0]!, uncoveredPolicy, uncovered), /no CAS binding/);
-    await assert.rejects(issuer.guardFor({ ...groupPolicy, query: falsePolicy.query }, groupProof), /registered policy/);
+    const receipt = await issuer.guardedRevoke(registry, alice.wallet[0]!.scalars[0]!, policy, proof);
+    const event = receipt.logs.map(l => { try { return d.state.interface.parseLog(l); } catch { return null; } })
+      .find(e => e?.name === 'Revoked')!;
+    const version = Number(event.args.version);
+    const verifier = new Verifier(d);
+    assert.equal((await verifier.verifyGuardProof(registry, version)).ok, true);
+    const expected = ethers.keccak256(ethers.AbiCoder.defaultAbiCoder().encode(['bytes32', 'bytes32'],
+      [policy.policyId, ethers.id(JSON.stringify(proof))]));
+    assert.equal(event.args.guardDigest, expected);
 
-    await issuer.revoke(registry, alice.wallet[0]!.scalars[0]!);
-    await assert.rejects(issuer.issue(registry, ['Stale'], alice.linkSecret,
-      { policy: groupPolicy, presentation: groupProof }), (e) => revertName(d, e) === 'StaleGroupVersion');
-    await assert.rejects(issuer.guardedRevoke(registry, bob.wallet[0]!.scalars[0]!, activePolicy, activeProof),
-      (e) => revertName(d, e) === 'StaleVersion');
+    // Direct contract call: valid accumulator transition, current versions, arbitrary proof bytes.
+    // No client proof verifier runs. The false public predicate must still reject the update.
+    const h = await readHistory(d, registry);
+    await assert.rejects(d.state.guardedRevoke!(...issuer.revokeArgs(registry, h, bob.wallet[0]!.scalars[0]!),
+      { policyId: policy.policyId, expectedVersions: [BigInt(version)], proof: '0x1234' }),
+      e => revertName(d, e) === 'GuardFalse');
+    await assert.rejects(issuer.revoke(registry, bob.wallet[0]!.scalars[0]!), e => revertName(d, e) === 'PolicyRequired');
     assert.equal(await d.state.isRevoked!(registry, ethers.toBeHex(bob.wallet[0]!.scalars[0]!, 32)), false);
+    assert.equal((await d.state.getValues!(registry)).version, BigInt(version));
   } finally {
     provider.destroy();
   }

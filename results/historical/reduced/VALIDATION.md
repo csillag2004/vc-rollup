@@ -1,4 +1,6 @@
-# Validation record
+# Historical reduced-design validation record
+
+These results predate the enforced public-guard ABI. Current evidence is at [results/VALIDATION.md](../../VALIDATION.md).
 
 Full local evidence and the terminal recording were generated from [source 622a9fe](https://github.com/csillag2004/vc-rollup/commit/622a9fe3012a5ce73d27cd97176846558fad929b) with a clean worktree. No OP Sepolia deployment or live measurements were performed.
 
@@ -42,5 +44,5 @@ The evaluation is confined to this code repository. No paper chapter was edited.
 - DONE: provide pinned native/container/archive setup, CI, machine-readable experiments and a recorded demo.
 - DONE: run full local measurements and retain exact output hashes/provenance.
 - DEFERRED by the selected scope: OP Sepolia redeployment and new live measurements.
-- BLOCKED for publication: key remediation and coordinated history/private-reference cleanup. See [release status](../design/SECURITY-RELEASE.md). This does not prevent review of the PR.
+- BLOCKED for publication: key remediation and coordinated history/private-reference cleanup. See [release status](../../../design/SECURITY-RELEASE.md). This does not prevent review of the PR.
 - NOT PERFORMED: PR merge, release publication and Zenodo deposit.

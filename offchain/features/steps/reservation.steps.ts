@@ -3,9 +3,11 @@ import assert from 'node:assert/strict';
 import { Given, When, Then } from '@cucumber/cucumber';
 import { ethers } from 'ethers';
 import { scalarToHex32 } from '../../src/crypto/bls.ts';
+import { readHistory, revertName } from '../../src/chain/client.ts';
 import { ACTION } from '../../src/actors/actors.ts';
-import { analyse } from '../../src/ql/compile.ts';
+import { compileGuard, ChainCompileError, CLASSES } from '../../src/ql/programs.ts';
 import { parse } from '../../src/ql/parser.ts';
+import { currentVersion } from '../../src/registry/history.ts';
 import type { ReservationWorld } from '../support/world.ts';
 
 /** the verifier's challenge; it travels in the presentation, so it must not name the holder */
@@ -95,6 +97,35 @@ Then(/^the version of (\w+) is (\d+)$/, async function (this: ReservationWorld, 
   assert.equal(await groupVersion(this, group), Number(version));
 });
 
+Then(/^anyone can verify (\w+)'s guard proof from the ledger$/, async function (this: ReservationWorld, name: string) {
+  // the guarded revocation that revoked the holder created this version, and its GuardProof event
+  const version = Number(await this.d.state.revokedAt!(this.registryId, scalarToHex32(this.y(name))));
+  const v = await this.verifier.verifyGuardProof(this.registryId, version);
+  assert.ok(v.ok, v.reason);
+  assert.equal(v.policyId, this.policy!.policyId);
+});
+
+// ---------------------------------------------------------------- the issuer trying to book twice
+
+When(/^the landlord revokes (\w+)'s credential under the policy "(.+)"$/, async function (this: ReservationWorld, name: string, query: string) {
+  const other = await this.landlord.registerPolicy(query, [['S', this.group('S')]]);
+  const p = await this.holder(name).present(other.query, other.bindings, nonce());
+  await this.attempt(`guardedRevoke ${name} under ${query}`, () => this.landlord.guardedRevoke(this.registryId, this.y(name), other, p));
+});
+
+When(/^the landlord revokes (\w+)'s credential with a made-up guard proof$/, async function (this: ReservationWorld, name: string) {
+  // no off-chain check, any bytes, every expected version current: the contract still evaluates the guard
+  const h = await readHistory(this.d, this.registryId);
+  const guard = {
+    policyId: this.policy!.policyId,
+    expectedVersions: this.policy!.bindings.map(() => BigInt(currentVersion(h))),
+    proof: ethers.toUtf8Bytes('trust me'),
+  };
+  const st = this.d.state.connect(this.landlord.signer) as ethers.Contract;
+  await this.attempt(`guardedRevoke ${name} with a made-up proof`, async () =>
+    (await st.guardedRevoke!(...this.landlord.revokeArgs(this.registryId, h, this.y(name)), guard)).wait());
+});
+
 // ---------------------------------------------------------------- proofs after the race
 
 When(/^a verifier checks (\w+)'s guard proof$/, async function (this: ReservationWorld, name: string) {
@@ -147,11 +178,43 @@ Then(/^the proof does not reveal which member of (\w+) (?:she|he|they) (?:is|are
 
 // ---------------------------------------------------------------- classification
 
-When('the policy {string} is classified', function (this: ReservationWorld, query: string) {
-  this.analysis = analyse(parse(query));
+When('the policy {string} is registered', async function (this: ReservationWorld, query: string) {
+  this.policy = await this.landlord.registerPolicy(query, this.bindings());
 });
 
-Then('its class is {string} and its CAS mode is {string}', function (this: ReservationWorld, cls: string, cas: string) {
-  assert.equal(this.analysis!.class, cls);
-  assert.equal(this.analysis!.cas, cas);
+Then('the contract classifies the presented part as {string} and the public part as {string}',
+  async function (this: ReservationWorld, presented: string, pub: string) {
+    const id = this.policy!.policyId;
+    assert.equal(CLASSES[Number(await this.d.policies.presentedClass!(id))], presented);
+    assert.equal(CLASSES[Number(await this.d.policies.publicClass!(id))], pub);
+  });
+
+Then('the front end computes the same classes', async function (this: ReservationWorld) {
+  const id = this.policy!.policyId;
+  assert.equal(this.policy!.programs.presentedClass, CLASSES[Number(await this.d.policies.presentedClass!(id))]);
+  assert.equal(this.policy!.programs.publicClass, CLASSES[Number(await this.d.policies.publicClass!(id))]);
+});
+
+Then('the policy is {word} for issuance updates', async function (this: ReservationWorld, support: string) {
+  const pol = this.d.policies.connect(this.landlord.signer) as ethers.Contract;
+  if (support === 'rejected') {
+    await assert.rejects(pol.bindPolicy!(this.landlord.credDefId, ACTION.issue, this.policy!.policyId),
+      (e: unknown) => revertName(this.d, e) === 'UnsupportedPrivateGuard');
+  } else {
+    assert.equal(support, 'supported');
+    await (await pol.bindPolicy!(this.landlord.credDefId, ACTION.issue, this.policy!.policyId)).wait();
+  }
+});
+
+When('the policy {string} is compiled for the chain', function (this: ReservationWorld, query: string) {
+  try {
+    compileGuard(parse(query), this.bindings());
+    this.compileError = undefined;
+  } catch (e) {
+    this.compileError = e;
+  }
+});
+
+Then('it cannot be bound to an on-chain action', function (this: ReservationWorld) {
+  assert.ok(this.compileError instanceof ChainCompileError, `compiled, or failed for another reason: ${String(this.compileError)}`);
 });

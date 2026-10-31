@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { g1, mul, randomScalar, utf8ToBytes, g1FromHex } from '../src/crypto/bls.ts';
+import { g1, g2, inv, mul, randomScalar, utf8ToBytes, g1FromHex } from '../src/crypto/bls.ts';
 import * as acc from '../src/crypto/accumulator.ts';
 import * as L from '../src/crypto/leaves.ts';
 import * as S from '../src/crypto/sigma.ts';
@@ -12,7 +12,7 @@ function registry() {
   const ys = [1n, 2n, 3n].map(() => randomScalar());
   const rec: Record<string, any> = {};
   for (const y of ys) {
-    const st = acc.issueStep(secret, v, y, () => 7n);
+    const st = acc.issueStep(secret, v, y);
     rec[y.toString()] = { A: st.receiptA, I: st.receiptI };
     v = { ...v, I: st.newI, WIR: st.newWIR };
   }
@@ -63,7 +63,7 @@ test('BBS leaf linked to a NotRevoked leaf, and distinctness', async () => {
   // issue y into a fresh registry so the receipt matches
   const { secret, pub: pub2 } = acc.generateAccumulatorKeys();
   const iv = acc.initialValues(pub2);
-  const ist = acc.issueStep(secret, iv, y, () => 1n);
+  const ist = acc.issueStep(secret, iv, y);
   const msgs = [yMsg, utf8ToBytes('Alice')];
   const sig = await bbs.sign(kp, header, msgs);
   const scalars = msgs.map(bbs.messageToScalar);
@@ -94,11 +94,24 @@ test('aggregate receipt from individual receipts equals the trapdoor one (|S| = 
   for (let n = 2; n <= 5; n++) {
     const members = Array.from({ length: n }, () => randomScalar());
     const A = pub.V0;
-    const receipts = members.map((y) => mul(A, 1n) && acc.issueStep(secret, acc.initialValues(pub), y, () => 1n).receiptA);
+    const receipts = members.map((y) => mul(A, 1n) && acc.issueStep(secret, acc.initialValues(pub), y).receiptA);
     const W = acc.aggregateReceipt(members, receipts);
     assert.ok(W.equals(acc.aggregateReceiptWithTrapdoor(secret, A, members)), `n=${n}`);
     assert.ok(acc.verifyAggregate(A, W, members, srs));
     const D = acc.groupMemberReceipt(members, members[0]!, srs);
     assert.ok(acc.verifyReceiptG1(acc.groupAccumulator(members, srs), members[0]!, D, pub.Qtilde));
   }
+});
+
+// This is a counterexample, not a security claim: the accumulator trapdoor permits
+// a false set-membership witness. Update guards therefore reject private clauses.
+test('trapdoor holder can forge a revoked status witness for the empty set', () => {
+  const alpha = 5n, y = 7n;
+  const opening = L.newOpening(y);
+  const Q = mul(g1, alpha);
+  const forged = mul(g2, inv(alpha + y));
+  const leaf = L.revLeafProver(g2, Q, L.commit(opening), opening, forged);
+  const proof = S.prove(leaf.leaf, new Map([[leaf.leaf, leaf.wit]]), 'trapdoor-counterexample');
+  const verifier = L.revLeafVerifier(g2, Q, L.commit(opening), leaf.pub);
+  assert.equal(S.verify(verifier, proof, 'trapdoor-counterexample'), true);
 });

@@ -9,4 +9,4 @@ authors:
     given-names: Martin
 repository-code: "https://github.com/csillag2004/vc-rollup"
 license: MIT
-abstract: "Companion implementation of credential query proofs, three accumulators, hidden issuance and atomic CAS updates under a trusted issuer/updater model."
+abstract: "Companion implementation of credential query proofs, three accumulators, public issuance and ledger-enforced public guarded updates, with private presentations evaluated off-chain."

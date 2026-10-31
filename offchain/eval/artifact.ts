@@ -1,4 +1,4 @@
-// Machine-readable evidence for the reduced, trusted-updater implementation.
+// Machine-readable evidence for ledger-enforced public update guards.
 // scripts/run.mjs supplies an isolated Prague chain and owns its lifetime.
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
@@ -23,8 +23,8 @@ const start = Date.now();
 const outputs: string[] = [];
 const report: string[] = ['# Local artifact results', '',
   `Mode: ${mode}${smoke ? ' (smoke)' : ' (full)'}. Generated ${new Date().toISOString()}.`, '',
-  'Scope: hidden issuance, trusted issuer/updater, off-chain proof verification and on-chain compare-and-swap.',
-  'These runs do not establish security against a malicious issuer or on-chain guard truth.', ''];
+  'Scope: public issuance, structural lifecycle checks and atomic on-chain public guard evaluation.',
+  'Private presented update guards fail closed; private presentation security against a trapdoor holder is not claimed.', ''];
 
 function write(name: string, text: string) {
   fs.writeFileSync(path.join(out, name), text.replaceAll(root, '<repo>'));
@@ -52,9 +52,11 @@ async function evaluate() {
   const flat = await runFlatReservation(process.env.RPC);
   const cases: [string, boolean, string][] = [
     ['naive_double_booking', flat.naiveDoubleBooking, 'two revoked group members'],
-    ['atomic_group_cas', flat.casRejected === 'StaleGroupVersion', String(flat.casRejected)],
+    ['atomic_public_guard', flat.guardRejected === 'GuardFalse', String(flat.guardRejected)],
+    ['guard_proof_from_ledger', flat.guardProofFromLedger, 'proof retrieved and verified'],
     ['stable_loser_proof', flat.loserProofValid, 'proof verifies'],
-    ['stable_loser_proof_after_updates', flat.loserProofStillValidLater, 'proof stays valid and fresh'],
+    ['stable_loser_proof_after_issuance', flat.loserProofStillValidLater, 'reservation proof stays valid and fresh'],
+    ['stable_proof_after_issue_and_revoke', flat.stableProofAfterSameRegistryUpdates, 'separate fixture: both later transitions in proof registry'],
     ['hidden_member_credential', flat.holderReservationProof, 'signature and revoked status verify'],
   ];
   const bddLog = execFileSync('npm', ['run', 'bdd', '--', '--format', `json:${path.join(out, 'bdd.json')}`, '--format', 'progress'],
@@ -94,12 +96,7 @@ async function benchmark() {
 
 function robustness() {
   console.log('Running contract rejection cases and actor guard regressions.');
-  const names = ['test_issueWrongSchnorrReverts', 'test_issueWrongStepReverts', 'test_revokeWrongStepReverts',
-    'test_revokeInconsistentRtildeReverts', 'test_revokeWrongWIRReverts', 'test_revokeStaleValuesReverts',
-    'test_revokeTwiceReverts', 'test_revokeOutOfFieldReverts', 'test_createGroupWrongWitnessReverts',
-    'test_createGroupUnsortedReverts', 'test_createGroupTooLargeReverts', 'test_policyCasModeTooWeakReverts',
-    'test_flatReservationCas', 'test_groupCasIgnoresOutsideRevocation', 'test_globalCasRejectsAnyUpdate',
-    'test_stableGuardNeedsNoComparison', 'test_wrongPolicyReverts'];
+  const names = ['test_issueTwiceReverts', 'test_issueMinusAlphaReverts', 'test_revokeNotIssuedReverts', 'test_issuerWithAlphaCannotRevokeUnissued', 'test_createGroupMemberNotIssuedReverts', 'test_publicGuardEvaluatedOnChain', 'test_publicGuardedIssueAcrossRegistries', 'test_publicGuardRejectsUnknownGroup', 'test_flatReservationRaceDecidedOnChain', 'test_issuerCannotReserveTwice', 'test_publicAtMostUsesCounters', 'test_presentedPolicyCannotBindUpdates', 'test_presentedGuardCannotAuthorizeUnboundIssue', 'test_presentedGuardCannotAuthorizeUnboundRevoke', 'test_updatePolicyCannotBeRemovedOrReplaced', 'test_presentationPolicyRemainsMutable', 'test_groupGuardIgnoresOutsideRevocation', 'test_wrongPolicyReverts', 'test_unguardedUpdateRejectedWhenBound', 'test_guardProofEmitted', 'test_guardDigestBindsProof', 'test_registerPolicyComputesClass', 'test_registerPolicyRejectsMalformed', 'testFuzz_publicClauseMatchesCount'];
   const raw = command('forge', ['test', '--use', './tools/solc', '--match-contract', 'StateRegistryTest',
     '--match-test', `^(${names.join('|')})(\\(.*\\))?$`, '--json']);
   write('robustness-forge.json', raw);
@@ -112,7 +109,7 @@ function robustness() {
   // Node's test runner exits nonzero on any failed test. Its log is retained alongside the CSV.
   rows.push(['actor_guard_integration', 'Success', 'see guard-integration.tap']);
   csv('robustness.csv', ['case', 'status', 'detail'], rows);
-  report.push('## Robustness', '', `${names.length} required Solidity rejection/freshness cases passed; actor guard integration passed.`,
+  report.push('## Robustness', '', `${names.length} required Solidity enforcement cases passed; actor guard integration passed.`,
     'See robustness.csv and guard-integration.tap for individual cases. These are functional rejection tests, not a denial-of-service study.', '');
 }
 
@@ -123,8 +120,8 @@ try {
   if (mode === 'robustness' || mode === 'reproduce') robustness();
   if (mode === 'demo') {
     const r = await runFlatReservation(process.env.RPC);
-    assert(r.naiveDoubleBooking && r.casRejected === 'StaleGroupVersion' && r.loserProofStillValidLater && r.holderReservationProof);
-    console.log('PASS: naive double booking reproduced; atomic CAS rejected the loser; holder proofs verified.');
+    assert(r.naiveDoubleBooking && r.guardRejected === 'GuardFalse' && r.loserProofStillValidLater && r.holderReservationProof && r.stableProofAfterSameRegistryUpdates && r.guardProofFromLedger);
+    console.log('PASS: naive double booking reproduced; on-chain public evaluation rejected the loser; holder proofs verified.');
   }
 } catch (e) {
   failed = e instanceof Error ? e.message : String(e);
@@ -135,7 +132,7 @@ try {
   write(`${mode}-report.md`, report.join('\n'));
   if (mode === 'reproduce') write('report.md', report.join('\n'));
   const provenance = {
-    schemaVersion: 1, mode, smoke, network: { target: 'anvil', chainId: 31337 }, success: !failed, error: failed ?? null,
+    schemaVersion: 1, implementationProfile: 'public-guards-v1', mode, smoke, network: { target: 'anvil', chainId: 31337 }, success: !failed, error: failed ?? null,
     startedAt: new Date(start).toISOString(), finishedAt: new Date().toISOString(), elapsedSeconds: (Date.now() - start) / 1000,
     revision: optional('git', ['rev-parse', 'HEAD']) ?? process.env.ARTIFACT_REVISION ?? null,
     dirty: optional('git', ['status', '--porcelain']),

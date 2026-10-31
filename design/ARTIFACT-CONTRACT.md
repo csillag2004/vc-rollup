@@ -1,4 +1,6 @@
-# Submission artifact contract
+# Historical reduced artifact contract
+
+Superseded for the current implementation by [ENFORCED-GUARDS.md](ENFORCED-GUARDS.md). This document records the scope of the archived reduced-design measurements.
 
 Decision dated 2026-10-31: the user selected the reduced design in [PR 8](https://github.com/csillag2004/vc-rollup/pull/8) for this artifact. This document supersedes the guard-restoration proposal for submission scope. Frozen `GUARDS.md`, its hash and the Lean contract/seals remain historical records; they are not silently revised to describe this implementation.
 

@@ -6,7 +6,8 @@
 //    in zero knowledge (only ∃ and at least k; ∀ and at most k over holder-chosen sets are rejected);
 //  - every other quantifier is about public registry data and is evaluated publicly against the
 //    bound registry version (groups: the public member list and revocation log; Issued: the
-//    whole-registry checks on A, R̃, I), optionally with an aggregate receipt as evidence.
+//    whole-registry checks on A, R̃, I, or the issued and revoked counts), optionally with an
+//    aggregate receipt as evidence.
 // Constants are folded, AND becomes one challenge, OR becomes a CDS threshold of 1.
 import type { Formula, Domain } from './ast.ts';
 import { pretty } from './ast.ts';
@@ -18,7 +19,7 @@ import * as acc from '../crypto/accumulator.ts';
 import type * as bbs from '../crypto/bbs.ts';
 import { g1FromHex, g1ToHex, type G1Point, mod } from '../crypto/bls.ts';
 import {
-  type RegistryHistory, revokedUpTo, refreshAto, revokedReceiptAt, valuesHashAt,
+  type RegistryHistory, revokedUpTo, issuedCountAt, refreshAto, revokedReceiptAt, valuesHashAt,
 } from '../registry/history.ts';
 
 // ---------------------------------------------------------------- public context
@@ -189,8 +190,6 @@ function publicEval(f: Formula, m: Mode): boolean {
         const rev = revokedUpTo(r, versionOf(m, r.registryId));
         if (g.name === 'Revoked') return rev.has(y);
         if (g.name === 'NotRevoked') return !rev.has(y);
-        if (g.name === 'Issued') return true;
-        if (g.name === 'NotIssued') return false;
         throw new CompileError(`${g.name} needs a holder-bound variable`);
       }
       case 'quant': {
@@ -222,12 +221,14 @@ function issuedCheck(g: Extract<Formula, { t: 'quant' }>, m: Mode): boolean {
   const b = binding(m, (g.dom as Extract<Domain, { kind: 'issued' }>).name);
   if (b.kind !== 'registry') throw new CompileError('Issued must be bound to a registry');
   const h = registryOf(m, b.registryId);
-  const v = h.values[versionOf(m, b.registryId)]!;
+  // issuance reveals y, so the counts are public (the contract counts the same way)
+  const nIss = issuedCountAt(h, versionOf(m, b.registryId));
   const nRev = revokedUpTo(h, versionOf(m, b.registryId)).size;
   const body = g.body;
   if (body.t !== 'atom' || body.args[0] !== g.v) throw new CompileError(`unsupported shape over Issued: ${pretty(g)}`);
-  const allRevoked = acc.allIssuedRevoked(v);
-  const noneRevoked = acc.noneRevoked(v, h.pub);
+  // Values alone are not injective set encodings against the trapdoor holder.
+  const allRevoked = nRev === nIss;
+  const noneRevoked = nRev === 0;
   switch (`${g.q}/${body.name}`) {
     case 'forall/Revoked': return allRevoked;
     case 'exists/NotRevoked': return !allRevoked;
@@ -235,8 +236,8 @@ function issuedCheck(g: Extract<Formula, { t: 'quant' }>, m: Mode): boolean {
     case 'forall/NotRevoked': return noneRevoked;
     case 'atleast/Revoked': return nRev >= g.k;
     case 'atmost/Revoked': return nRev <= g.k;
-    case 'forall/Issued': return true;
-    case 'exists/NotIssued': return false;
+    case 'atleast/NotRevoked': return nIss - nRev >= g.k;
+    case 'atmost/NotRevoked': return nIss - nRev <= g.k;
     default: throw new CompileError(`unsupported shape over Issued: ${pretty(g)}`);
   }
 }
@@ -319,8 +320,6 @@ function atomNode(f: Extract<Formula, { t: 'atom' }>, m: Mode, scope: Scope): Bu
   const cred = m.credentials[ci]!;
   switch (f.name) {
     case 'Sig': return atomConst(f, m, scope);
-    case 'Issued': return true;     // a presented credential is issued (system model)
-    case 'NotIssued': return false;
     case 'SameHolder': return sameHolderNode(f, m, scope);
     case 'NotRevoked': case 'Revoked': {
       const h = registryOf(m, cred.registryId);
@@ -520,8 +519,6 @@ function holderTruth(f: Extract<Formula, { t: 'quant' }>, m: Mode, scope: Scope,
         switch (g.name) {
           case 'Revoked': return revc.has(yc);
           case 'NotRevoked': return !revc.has(yc);
-          case 'Issued': return true;
-          case 'NotIssued': return false;
           case 'Sig': return atomConst(g, m, inner);
           case 'SameHolder': {
             const d = inner.creds.get(g.args[1]!);
@@ -590,6 +587,14 @@ export function verifyPresentation(query: Formula, p: Presentation, ctx: PublicC
     const credLeaves = p.credentials.map((c) => {
       const h = registryOf(m, c.registryId);
       if (h.credDefId !== c.credDefId) throw new CompileError('credential registry does not belong to its CredDef');
+      if (c.header !== Buffer.from(c.credDefId, 'utf8').toString('hex')) {
+        throw new CompileError('credential signed header does not match its CredDef');
+      }
+      if (c.yIndex !== 0 || !Number.isSafeInteger(c.bbs.L) || c.bbs.L < 2 ||
+          (c.lsIndex !== undefined && c.lsIndex !== c.bbs.L - 1) ||
+          ((c.bbs.Kls !== undefined) !== (c.lsIndex !== undefined))) {
+        throw new CompileError('credential message roles do not match the artifact schema');
+      }
       const spec = { pk: h.issuerPk, header: Buffer.from(c.header, 'hex'), yIndex: c.yIndex, ...(c.lsIndex !== undefined ? { lsIndex: c.lsIndex } : {}) };
       return L.bbsLeafVerifier(spec, c.bbs);
     });
