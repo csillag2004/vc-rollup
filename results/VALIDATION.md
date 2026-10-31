@@ -26,6 +26,14 @@ The container smoke used [the implementation checkpoint](https://github.com/csil
 
 The formula sampler has a fixed seed. Crypto randomness is intentionally fresh, and wall-clock measurements were taken on a shared development host. Each proof case includes one warm-up and three paired generation/verification samples. Gas and calldata come from actual transaction receipts/input. These measurements are not L1 data fees or concurrency/load guarantees.
 
+## Companion evaluation
+
+The [written evaluation](evaluation/evaluation.md) answers four research questions using the unchanged full-run data. It includes reproducible SVG/PNG figures, observed timing ranges, per-operation gas/calldata, interpretation and threats to validity. The renderer verifies the raw-output hashes before deriving any figure; a deliberately modified CSV was rejected. `just reproduce` now generates this analysis after the measurements, and `just figures results/local out/evaluation` rebuilds it independently.
+
+Both native and container smoke reproduction passed with the evaluation stage included. SVGs were parsed, figures visually inspected, and derived hashes verified.
+
+The evaluation is confined to this code repository. No paper chapter was edited.
+
 ## Completion and release boundary
 
 - DONE: inspect Markdown and all eight merged PRs; use the user-selected reduced design.

@@ -14,3 +14,5 @@ demo/*.vtt
 wallets*
 **/.git
 lib/forge-std
+
+.venv-evaluation/

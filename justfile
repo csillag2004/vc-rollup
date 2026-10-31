@@ -6,6 +6,7 @@ default:
 install:
     bash scripts/install-contract-deps.sh
     npm --prefix offchain ci
+    bash scripts/evaluation.sh --setup
 
 build:
     forge build --use ./tools/solc
@@ -31,6 +32,7 @@ robustness *args: build
 
 reproduce *args: build
     node scripts/run.mjs reproduce {{args}}
+    bash scripts/evaluation.sh "${OUT:-out}" "${OUT:-out}/evaluation"
 
 demo *args: build
     node scripts/run.mjs demo {{args}}
@@ -44,3 +46,7 @@ hygiene *args:
 # Known historical exposures remain a release blocker; --strict reports them.
 secrets *args:
     bash scripts/secrets.sh {{args}}
+
+# Interpret a hash-verified run and render its publication figures.
+figures input="out" output="out/evaluation":
+    bash scripts/evaluation.sh "{{input}}" "{{output}}"

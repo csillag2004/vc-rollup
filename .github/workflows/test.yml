@@ -45,6 +45,7 @@ jobs:
             out/*.log
             out/*.tap
             out/demo/
+            out/evaluation/
           if-no-files-found: warn
   container:
     runs-on: ubuntu-24.04

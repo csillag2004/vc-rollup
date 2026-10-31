@@ -24,3 +24,5 @@ docs/
 
 # Reproducible artifact outputs
 /qlc/target/
+
+.venv-evaluation/

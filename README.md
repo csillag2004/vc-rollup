@@ -6,7 +6,7 @@ This prototype combines BBS credentials, a query language, three BLS12-381 accum
 
 ## Setup
 
-Clone recursively to obtain the Foundry dependencies. Use Node.js 26.7.0, Foundry 1.8.6 and just 1.58.0 as pinned in `mise.toml`, Rust 1.94.1 as pinned in `rust-toolchain.toml`, npm and Python 3. Foundry must support the Prague hardfork. The `just lean` recipe installs the checksum-pinned Lean 4.23.0 toolchain locally; it needs curl, tar and zstd on Linux x86-64. On other platforms use elan with the pinned `verification/lean/lean-toolchain`. Run `just install` to install the locked dependencies. The lockfile pins ethers 6.17.0 and Cucumber 13.3.0 alongside the cryptographic dependencies.
+Clone recursively to obtain the Foundry dependencies. Use Node.js 26.7.0, Foundry 1.8.6 and just 1.58.0 as pinned in `mise.toml`, Rust 1.94.1 as pinned in `rust-toolchain.toml`, npm and Python 3.11 or newer with venv/pip support. Foundry must support the Prague hardfork. The `just lean` recipe installs the checksum-pinned Lean 4.23.0 toolchain locally; it needs curl, tar and zstd on Linux x86-64. On other platforms use elan with the pinned `verification/lean/lean-toolchain`. Run `just install` to install the locked dependencies. Set `EVALUATION_PYTHON` before installation if a specific Python interpreter is needed; plotting dependencies are isolated in `.venv-evaluation/`. The lockfile pins ethers 6.17.0 and Cucumber 13.3.0 alongside the cryptographic dependencies.
 
 ## Reproduce
 
@@ -44,6 +44,10 @@ The local recipes do not recreate historical OP Sepolia transactions, perform a 
 ## Results and release
 
 The paper's evaluation chapter is still a skeleton, so this repository does not invent table numbers or a results tag. Current measurements must identify their source revision through provenance. Publication remains blocked by [historical key exposure](design/SECURITY-RELEASE.md); `just secrets --strict` is deliberately stricter than the CI baseline. A PR is not a release or a Zenodo deposit.
+
+## Evaluation
+
+The [written evaluation](results/evaluation/evaluation.md) states four research questions, interprets the correctness, classification, proof-cost and EVM results, and bounds the claims. Its figures and tables are derived from the recorded CSVs, with hashes checked first. `just reproduce` generates both measurements and evaluation; `just figures results/local out/evaluation` rebuilds the interpretation and figures from the committed run. Matplotlib and its dependencies are pinned in `scripts/evaluation-requirements.txt`.
 
 ## Recorded results
 
