@@ -10,11 +10,14 @@ out/
 # Docs
 docs/
 
-# Dotenv file
+# Secrets never enter the repository; commit an .env.example with placeholders instead.
 .env
-.env copy
-
-.wallets.txt
+.env.*
+!.env.example
+wallets*
+*.pem
+*.key
+.claude/settings.local.json
 
 /node_modules
 /hellocucumber/node_modules
