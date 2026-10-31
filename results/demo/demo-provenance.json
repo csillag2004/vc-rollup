@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "mode": "demo",
+  "smoke": false,
+  "network": {
+    "target": "anvil",
+    "chainId": 31337
+  },
+  "success": true,
+  "error": null,
+  "startedAt": "2026-10-31T17:10:39.750Z",
+  "finishedAt": "2026-10-31T17:10:45.985Z",
+  "elapsedSeconds": 6.235,
+  "revision": "622a9fe3012a5ce73d27cd97176846558fad929b",
+  "dirty": "",
+  "platform": {
+    "os": "linux",
+    "release": "7.2.8-9-omarchy",
+    "architecture": "x64",
+    "cpu": "AMD Ryzen 9 7950X3D 16-Core Processor",
+    "logicalCpus": 32,
+    "totalMemoryBytes": 100830253056
+  },
+  "tools": {
+    "node": "v26.7.0",
+    "forge": "forge Version: 1.8.6\nCommit SHA: 6bad0a66de7c83f7b33695044138f0f5fa4c5990\nBuild Timestamp: 2026-10-21T17:56:11.890310850Z (1792605371)\nBuild Profile: dist",
+    "anvil": "anvil Version: 1.8.6\nCommit SHA: 6bad0a66de7c83f7b33695044138f0f5fa4c5990\nBuild Timestamp: 2026-10-21T17:56:11.890310850Z (1792605371)\nBuild Profile: dist",
+    "solc": "solc, the solidity compiler commandline interface\nVersion: 0.8.30+commit.73712a01.Linux.g++"
+  },
+  "parameters": {
+    "hardfork": "prague",
+    "classificationSeed": 2026,
+    "formulasPerModel": 3000,
+    "universeSize": 4,
+    "maxFormulaDepth": 4,
+    "proofWarmups": 1,
+    "proofSamples": 3,
+    "groupSizes": [
+      4,
+      16,
+      64
+    ],
+    "cryptoRandomness": "OS CSPRNG; fresh keys, IDs and proof blinding each run"
+  },
+  "sha256": {
+    "demo-report.md": "ed2f1964e3cef85015c6b7a472a41d222aa241603478f7d6898dcff34db71403"
+  }
+}

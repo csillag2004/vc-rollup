@@ -5,6 +5,8 @@ title: "vc-rollup: companion artifact for Joint anonymized issuance and revocati
 authors:
   - family-names: Kocsis
     given-names: Csillag Kamilla
+  - family-names: Farkas
+    given-names: Martin
 repository-code: "https://github.com/csillag2004/vc-rollup"
 license: MIT
 abstract: "Companion implementation of credential query proofs, three accumulators, hidden issuance and atomic CAS updates under a trusted issuer/updater model."

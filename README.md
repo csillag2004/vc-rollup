@@ -45,6 +45,22 @@ The local recipes do not recreate historical OP Sepolia transactions, perform a 
 
 The paper's evaluation chapter is still a skeleton, so this repository does not invent table numbers or a results tag. Current measurements must identify their source revision through provenance. Publication remains blocked by [historical key exposure](design/SECURITY-RELEASE.md); `just secrets --strict` is deliberately stricter than the CI baseline. A PR is not a release or a Zenodo deposit.
 
+## Recorded results
+
+[Full local report](results/local/report.md), [provenance](results/local/provenance.json), and [demo recording](results/demo/demo.cast) were generated from [the recorded source revision](https://github.com/csillag2004/vc-rollup/commit/622a9fe3012a5ce73d27cd97176846558fad929b). The full run took 61.2 seconds on the host described in provenance. This was a shared development host without CPU isolation; timings are measurements of this run, not performance guarantees.
+
+| Evidence | Recipe | Output |
+|---|---|---|
+| Reservation race and BDD correctness | `just evaluate` | `out/correctness.csv`, `out/bdd.json` |
+| Bounded classification, 3,000 formulas per model | `just evaluate` | `out/classification.csv` |
+| Proof scaling, groups of 4/16/64 and thresholds 1–4 | `just benchmark` | `out/scalability.csv` |
+| Gas and calldata, including all CAS modes | `just benchmark` | `out/gas.csv` |
+| Invalid inputs, stale state and guard regressions | `just robustness` | `out/robustness.csv`, `out/guard-integration.tap` |
+| Complete run and parameters | `just reproduce` | `out/report.md`, `out/provenance.json` |
+| Recorded terminal demonstration | `just demo` | `out/demo/demo.cast`, captions and transcript |
+
+See [validation and remaining release work](results/VALIDATION.md). Re-running a recipe overwrites its outputs; use `OUT` to keep separate runs.
+
 ## Evidence and scope
 
 | Evidence | Implementation |
@@ -59,6 +75,10 @@ The paper's evaluation chapter is still a skeleton, so this repository does not 
 The race demonstrates prevention of a second reservation when the issuer verifies a true guard and declares the correct CAS policy. The contract does not evaluate the query or verify the guard proof. Pairing checks do not enforce all set relations against an issuer who knows the accumulator secret. Read the [trust boundary](design/ARTIFACT-CONTRACT.md) before interpreting the results.
 
 [Historical evaluation](design/EVALUATION.md) and [OP Sepolia evidence](design/OP-SEPOLIA-RUN.md) are retained with their original provenance. Local reproduction does not redeploy contracts or establish current testnet performance. [Thesis changes](design/THESIS-CHANGES.md) identify claims that need alignment with this reduced design.
+
+## Contributions
+
+The paper is by Kocsis Csillag Kamilla. The companion includes work by Kamilla and Martin Farkas. In particular, the Rust `qlc` front end was built by Martin with Claude, as recorded in [its original PR](https://github.com/csillag2004/vc-rollup/pull/2); it is not student-authored proof-generation code. The [Lean model PR](https://github.com/csillag2004/vc-rollup/pull/1) records the separate formalization effort. This artifact hardening was performed with GPT-6 Astra through the Codex harness in T3 Code. Repository authorship does not change the paper's authorship.
 
 ## Citation and license
 
