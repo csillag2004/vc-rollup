@@ -1,6 +1,8 @@
 # Paper coverage
 
-What the Lean model says about each lemma and design-level claim of [`content/03-proposed-approach.tex` at e53e483](https://github.com/BlackLight54/TDK26-Kocsis-Kamilla/blob/e53e4837cfaf28f11ea9cf69b7e9c7b3e206d22e/content/03-proposed-approach.tex). Theorem locations and axioms are in `THEOREMS.md`; the encoding and its assumptions are in `CONTRACT.md`.
+This historical mapping includes claims from a stronger contract revision. For the selected reduced artifact, interpret the ideal-model results subject to [ARTIFACT-CONTRACT.md](../../design/ARTIFACT-CONTRACT.md), especially its trusted issuer/updater premises.
+
+What the Lean model says about each lemma and design-level claim of the historical paper source `content/03-proposed-approach.tex`, revision `e53e4837cfaf28f11ea9cf69b7e9c7b3e206d22e` (private source, not included in this artifact). Theorem locations and axioms are in `THEOREMS.md`; the encoding and its assumptions are in `CONTRACT.md`.
 
 The findings for the author are in `paper-todos.json`. Its `todos` are ready-to-paste `\atodo[inline]{…}` notes, each backed by the theorems it names and placed by a LaTeX label of the chapter. Its `judgment` items are observations that no theorem backs; they need a supervisor's call before they become to-dos. To preview or insert the notes:
 

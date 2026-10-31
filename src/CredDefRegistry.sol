@@ -5,8 +5,7 @@ interface IEthereumDIDRegistry {
     function identityOwner(address identity) external view returns (address);
 }
 
-contract CredDefRegistry{
-
+contract CredDefRegistry {
     struct CredDef {
         address issuer;
         bytes32 schemaId;
@@ -28,7 +27,9 @@ contract CredDefRegistry{
         schemaRegistry = SchemaRegistry(_schemaRegistry);
     }
 
-    event CredDefRegistered(bytes32 indexed credDefId, address indexed issuer, bytes32 indexed schemaId, string tag, bytes32 keyId);
+    event CredDefRegistered(
+        bytes32 indexed credDefId, address indexed issuer, bytes32 indexed schemaId, string tag, bytes32 keyId
+    );
 
     error ZeroAddress();
     error NotDidOwner(address issuer, address caller);
@@ -51,18 +52,22 @@ contract CredDefRegistry{
         bytes32 keyId
         //bytes calldata publicKeyMaterial,
         //bytes calldata signParams
-    ) external onlyDidOwner(issuer) returns (bytes32 credDefId){
+    )
+        external
+        onlyDidOwner(issuer)
+        returns (bytes32 credDefId)
+    {
         //revertek
-        if (bytes(tag).length==0) revert EmptyTag();
+        if (bytes(tag).length == 0) revert EmptyTag();
         if (keyId == bytes32(0)) revert EmptyKeyId();
         if (!schemaRegistry.exists(schemaId)) revert UnknownSchema(schemaId);
         //if (publicKeyMaterial.length == 0) revert("PublicKeyMaterial is empty.");
         //if (signParams.length == 0) revert ("SignParams is empty");
-    
+
         credDefId = keccak256(abi.encodePacked(issuer, schemaId, tag));
 
         //ha már létezik revert
-        if (creddefs[credDefId].createdAt != 0){
+        if (creddefs[credDefId].createdAt != 0) {
             revert CredDefExists(credDefId);
         }
 
@@ -82,13 +87,11 @@ contract CredDefRegistry{
         return credDefId;
     }
 
-
-    function getCredDef(bytes32 credDefId) external view returns (CredDef memory){
-        if(creddefs[credDefId].createdAt==0) revert UnknownCredDef(credDefId);
+    function getCredDef(bytes32 credDefId) external view returns (CredDef memory) {
+        if (creddefs[credDefId].createdAt == 0) revert UnknownCredDef(credDefId);
         return creddefs[credDefId];
     }
 
-    
     function exists(bytes32 credDefId) external view returns (bool) {
         return creddefs[credDefId].createdAt != 0;
     }
@@ -98,5 +101,4 @@ contract CredDefRegistry{
         if (creddefs[credDefId].createdAt == 0) revert UnknownCredDef(credDefId);
         return creddefs[credDefId].issuer;
     }
-
 }

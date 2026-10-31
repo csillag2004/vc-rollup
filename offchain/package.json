@@ -8,7 +8,6 @@
     "test": "node --test test/*.test.ts",
     "typecheck": "tsc --noEmit",
     "eval:classify": "node eval/classify-exhaustive.ts",
-    "eval:toctou": "node eval/toctou.ts",
     "eval:bench": "node eval/bench.ts",
     "demo": "node eval/flat-reservation.ts",
     "eval:gas": "node eval/gas.ts",
@@ -18,15 +17,18 @@
     "bdd:op-sepolia": "TARGET=op-sepolia cucumber-js"
   },
   "dependencies": {
-    "@digitalbazaar/bbs-signatures": "^3.1.0",
+    "@digitalbazaar/bbs-signatures": "3.1.0",
     "@noble/curves": "1.9.7",
     "@noble/hashes": "1.8.0",
-    "ethers": "6.15.0"
+    "ethers": "6.17.0"
   },
   "devDependencies": {
-    "@cucumber/cucumber": "^11.3.0",
+    "@cucumber/cucumber": "13.3.0",
     "@types/node": "24.3.0",
     "solc": "0.8.30",
     "typescript": "5.9.2"
+  },
+  "overrides": {
+    "tmp": "0.2.7"
   }
 }

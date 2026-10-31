@@ -154,6 +154,10 @@ function registryOf(m: Mode, id: string): RegistryHistory {
     if (!m.prover) throw new CompileError(`no bound version for registry ${id}`);
     m.versions[id] = h.values.length - 1;
   }
+  const v = m.versions[id]!;
+  if (!Number.isSafeInteger(v) || v < 0 || v >= h.values.length) {
+    throw new CompileError(`invalid bound version for registry ${id}`);
+  }
   return h;
 }
 
@@ -581,6 +585,7 @@ export function verifyPresentation(query: Formula, p: Presentation, ctx: PublicC
       prover: false, ctx, versions: p.versions, credentials: p.credentials, instances: p.instances, leaves: p.leaves, leafCursor: 0,
       evidence: p.evidence, topLeaves: [],
     };
+    for (const id of Object.keys(p.versions)) registryOf(m, id);
     for (const b of ctx.bindings.values()) if (b.kind !== 'creddef') registryOf(m, b.registryId);
     const credLeaves = p.credentials.map((c) => {
       const h = registryOf(m, c.registryId);

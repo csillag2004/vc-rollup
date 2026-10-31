@@ -1,0 +1,21 @@
+* text=auto
+*.sh text eol=lf
+*.py text eol=lf
+*.ts text eol=lf
+*.sol text eol=lf
+*.lean text eol=lf
+*.md text eol=lf
+*.cff text eol=lf
+*.json text eol=lf
+*.csv text eol=lf
+*.cast text eol=lf
+
+# Local agent instructions are not part of source archives.
+.claude/ export-ignore
+.claude/** export-ignore
+**/.claude/ export-ignore
+**/.claude/** export-ignore
+AGENTS.md export-ignore
+CLAUDE.md export-ignore
+**/AGENTS.md export-ignore
+**/CLAUDE.md export-ignore

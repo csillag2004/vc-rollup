@@ -21,3 +21,6 @@ docs/
 
 /offchain/node_modules
 /offchain/.cache
+
+# Reproducible artifact outputs
+/qlc/target/

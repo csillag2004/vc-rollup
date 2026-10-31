@@ -1,7 +1,7 @@
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-contract SchemaRegistry{
-
+contract SchemaRegistry {
     struct Schema {
         address author;
         string name;
@@ -18,7 +18,9 @@ contract SchemaRegistry{
 
     mapping(bytes32 => Schema) private schemas;
 
-    event SchemaRegistered(bytes32 indexed schemaId, address indexed author, string name, string version, bool holderBound);
+    event SchemaRegistered(
+        bytes32 indexed schemaId, address indexed author, string name, string version, bool holderBound
+    );
 
     error EmptyName();
     error EmptyVersion();
@@ -35,12 +37,12 @@ contract SchemaRegistry{
         string calldata version,
         bool holderBound,
         string[] calldata attributeNames
-    ) external returns (bytes32 schemaId){
+    ) external returns (bytes32 schemaId) {
         //előszőr revertek
-        if (bytes(name).length==0) revert EmptyName();
-        if (bytes(version).length==0) revert EmptyVersion();
-        if (attributeNames.length==0) revert NoAttributes();
-        
+        if (bytes(name).length == 0) revert EmptyName();
+        if (bytes(version).length == 0) revert EmptyVersion();
+        if (attributeNames.length == 0) revert NoAttributes();
+
         uint256 n = attributeNames.length;
         // nevek: nem üres, nem a két protokoll-mező neve, egyedi
         bytes32[] memory hashes = new bytes32[](n);
@@ -54,11 +56,10 @@ contract SchemaRegistry{
             hashes[i] = h;
         }
 
-
         schemaId = keccak256(abi.encode(msg.sender, name, version, holderBound));
 
         //ha már létezik revert
-        if(schemas[schemaId].createdAt != 0){
+        if (schemas[schemaId].createdAt != 0) {
             revert SchemaExists(schemaId);
         }
 
@@ -76,7 +77,6 @@ contract SchemaRegistry{
             s.attributeNames.push(LINK_SECRET);
         }
         s.createdAt = block.timestamp;
-        
 
         //event kiküldés
         emit SchemaRegistered(schemaId, msg.sender, name, version, holderBound);
@@ -84,9 +84,8 @@ contract SchemaRegistry{
         return schemaId;
     }
 
-
-    function getSchema(bytes32 schemaId) external view returns (Schema memory){
-        if(schemas[schemaId].createdAt==0) revert UnknownSchema(schemaId);
+    function getSchema(bytes32 schemaId) external view returns (Schema memory) {
+        if (schemas[schemaId].createdAt == 0) revert UnknownSchema(schemaId);
         return schemas[schemaId];
     }
 
@@ -98,5 +97,4 @@ contract SchemaRegistry{
         if (schemas[schemaId].createdAt == 0) revert UnknownSchema(schemaId);
         return schemas[schemaId].holderBound;
     }
-
 }

@@ -9,7 +9,9 @@ contract SchemaRegistryTest is Test {
     address public alice = makeAddr("alice");
     address public bob = makeAddr("bob");
 
-    event SchemaRegistered(bytes32 indexed schemaId, address indexed author, string name, string version, bool holderBound);
+    event SchemaRegistered(
+        bytes32 indexed schemaId, address indexed author, string name, string version, bool holderBound
+    );
 
     function setUp() public {
         schemaRegistry = new SchemaRegistry();

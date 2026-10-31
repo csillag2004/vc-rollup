@@ -17,7 +17,9 @@ contract CredDefRegistryTest is Test {
     bytes32 public schemaId;
     bytes32 public constant KEY_ID = keccak256("alice#bbs-key-1");
 
-    event CredDefRegistered(bytes32 indexed credDefId, address indexed issuer, bytes32 indexed schemaId, string tag, bytes32 keyId);
+    event CredDefRegistered(
+        bytes32 indexed credDefId, address indexed issuer, bytes32 indexed schemaId, string tag, bytes32 keyId
+    );
 
     function setUp() public {
         didRegistry = new EthereumDIDRegistry();

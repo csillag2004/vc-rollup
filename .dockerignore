@@ -1,0 +1,16 @@
+**/node_modules
+**/target
+.git
+.claude
+out
+cache
+results
+verification/lean/tools
+verification/lean/.lake
+demo/*.cast
+demo/*.vtt
+
+.env*
+wallets*
+**/.git
+lib/forge-std

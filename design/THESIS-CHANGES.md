@@ -1,33 +1,13 @@
-# Changes the thesis text needs (not applied here)
+# Thesis alignment for the reduced artifact
 
-Reference: `TDK26-Kocsis-Kamilla/content/proposed-approach.tex`, `background.tex`, `detaild_trust_model.tex`.
+The current artifact follows [ARTIFACT-CONTRACT.md](ARTIFACT-CONTRACT.md), selected on 2026-10-31. The paper's title is *Joint anonymized issuance and revocation for complex verifiable credential chains*. This checklist records required alignment; it does not change the student's text.
 
-## Background
-1. Replace the "BBS+ signatures" subsection with BBS (IETF `draft-irtf-cfrg-bbs-signatures`, signature `(A, e)`, Tessaro–Zhu); keep BBS+ at most as history.
-2. Layer 2: describe an optimistic rollup (OP Stack, OP Sepolia) instead of Scroll zkEVM, and the EIP-2537 BLS12-381 precompiles (pairing check, MSM). Maintainability already says "optimistic".
-3. Add compare-and-swap (existing todo) and the pairing notation `e`, `g̃`, `Q̃ = g̃^α`, `Q = g^α`.
-
-## 3.1 System model, 3.4 VDR
-4. `def:representation`, `def:accumulator-updates`: `A = V0^{1/P_Rev(α)}` (static add); issuing changes only I (and `W_IR`). Fix `lem:representation` accordingly.
-5. Groups (def:domains, first item): a finite set of **already issued** credential IDs, fixed by a party other than the prover, anchored in the VDR with an on-chain subset check `e(W_S, [P_S]_2) = e(I, g̃)`. Scope: `W_S = I^{1/P_S(α)}` can be computed for *any* set by whoever knows α, so the check binds an honest issuer only (like every check that compares values at α); without α, `W_S` needs the whole issued set, so in practice only the issuer anchors groups.
-6. `def:group-version`: say explicitly that, by 5., the only update that can touch a member is revocation.
-7. VDR components: add the PolicyRegistry and CredDef-level rules (policy bound to issue / revoke / present). Consider a new claim in the S1–S10 table ("policy-enforced lifecycle").
-
-## 3.2 Trust model
-8. Verify on write is now true: the contract checks step, consistency and subset on every revocation; issuance is step-checked in zero knowledge (`T = I^y` + Schnorr, y stays hidden). Uniqueness of a fresh y is not checkable and rests on the honest issuer.
-9. Guard proofs are checked off-chain by the updater; the chain stores a guard digest. Say so in the scope.
-
-## 3.3 Atomic guarded update
-10. Formula classes: use stable / co-stable / volatile everywhere; line ~402 says "non-stable"; cite Chandy–Lamport precisely.
-11. `lem:closure` (d) is incomplete (e.g. `atmost k x∈Issued. NotRevoked(x)` is volatile); add the polarity rules (↑/↓/mixed, `∀x∈Issued` = ↓ ⊔ body, `∃/atleast x∈Issued` = ↑ ⊔ body, `atmost` flips).
-12. `def:fresh-guard` (b) stays (group CAS also for volatile group-only formulas).
-13. Guards may span several registries (e.g. "issue X only if Y is revoked"); the update then carries the expected version of every bound registry or group. Generalise the fresh-guard definition to a set of versions.
-14. Value freshness is enforced by the on-chain step checks (new values must step from the current ones), so a separate expected global version is not needed for it.
-
-## 3.5 Query language
-15. Move the concrete syntax table out of the comment; add `->`, `Sig(x, "Name")`, `SameHolder(x, y)`, `Active(x)`.
-16. Replace the "domains must not overlap" todo: several quantifiers or `atleast k` over `Presented` get pairwise distinctness proofs (`y_i ≠ y_j`).
-17. Over `Presented` (and over holder-bound variables) only ∃ and at least k are meaningful (already in 3.1); fix the typo "∃x ∀S" (line ~45) to "∀x ∈ S".
-
-## Evaluation (empty chapter)
-18. TOCTOU pair (naive vs CAS), exhaustive classification check, benchmark table: numbers in `design/EVALUATION.md` once produced.
+- Describe BBS signatures, the prototype's composed sigma presentations, BLS12-381 and EIP-2537. State OP Stack/Prague execution assumptions and distinguish signature compatibility from presentation compatibility.
+- Use the static-add representation A = V0^(1/P_Rev(α)); issuance updates I and W_IR. Explain hidden-y issuance and its Schnorr step proof. Duplicate issuance and the issued status of a revoked ID rely on the trusted issuer.
+- Describe groups as intended subsets of issued IDs. The pairing subset test does not enforce that relation against the issuer holding α. Revocation publishes identifiers and storage rejects repeated visible revocations.
+- Describe policies as author-declared classes and CAS modes. Query semantics and guard proofs are checked off chain by the updater; the contract enforces policy binding and version comparisons. Remove claims of on-chain query evaluation, public issuance storage, compiler-checked on-chain classes or `GuardProof` events containing proof bytes.
+- State that the ledger stores a proof commitment. Proof recovery requires separate retention. CAS establishes freshness conditional on a correctly verified and classified guard, not guard truth itself.
+- Qualify privacy claims: issuance identifiers are hidden, while revocations and groups reveal identifiers; historical receipt versions and timing can leak information. Lean does not prove privacy or cryptographic security.
+- Separate the ideal Lean model from implementation enforcement. Exact set-relation checks and guard truth are model premises that the reduced implementation entrusts to the issuer/updater. Cite the frozen model and this gap together.
+- Populate the evaluation from recorded runs: naive/CAS race (`StaleGroupVersion`), bounded classification, proof cost, gas/calldata and robustness. Report revision, environment, parameters and repetitions. Keep historical OP Sepolia evidence separate. Do not transplant numbers from the stronger guard implementation.
+- Treat witness-refresh scaling and larger concurrency stress as optional experiments unless separately commissioned. Mark unsupported claims and missing measurements explicitly.

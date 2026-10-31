@@ -117,3 +117,58 @@ test('freshness: co-stable guard goes stale on a member revocation, stable proof
   assert.equal(checkFreshness(loser.p, loser.v.class, loser.v.cas, ctx).fresh, true);
   assert.equal(verifyPresentation(parse('exists x in S. Revoked(x)'), loser.p, ctx).ok, true);
 });
+
+import { validateGuardPresentation, type PolicyRef } from '../src/actors/actors.ts';
+
+test('trusted updater rejects invalid and uncovered proofs while preserving CAS versions', async () => {
+  const { reg, ctx, alice, members } = await world();
+  const policy = (query: string, context = ctx): PolicyRef => ({ policyId: 'test-policy', query, bindings: [...context.bindings] });
+  const q = 'forall x in S. NotRevoked(x)';
+  const { p } = run(q, ctx, []);
+  assert.doesNotThrow(() => validateGuardPresentation(policy(q), p, ctx));
+  assert.throws(() => validateGuardPresentation(policy('exists x in S. Revoked(x)'), p, ctx), /another query/);
+  const falseProof = { ...p, query: 'exists x in S. Revoked(x)' };
+  assert.throws(() => validateGuardPresentation(policy(falseProof.query), falseProof, ctx), /query is false/);
+  const active = 'exists x in Presented. Sig(x, "Landlord") & NotRevoked(x)';
+  const onlyCredDef: PublicContext = { ...ctx, bindings: new Map([['Landlord', ctx.bindings.get('Landlord')!]]) };
+  const uncovered = run(active, onlyCredDef, [alice]).p;
+  assert.throws(() => validateGuardPresentation(policy(active, onlyCredDef), uncovered, onlyCredDef), /no CAS binding/);
+  const covered = run(active, ctx, [alice]).p;
+  assert.doesNotThrow(() => validateGuardPresentation(policy(active), covered, ctx));
+  const tampered = structuredClone(covered);
+  tampered.proof = null;
+  assert.throws(() => validateGuardPresentation(policy(active), tampered, ctx), /missing proof/);
+  const neutral = 'exists x in Presented. Sig(x, "Landlord")';
+  const independent = run(neutral, onlyCredDef, [alice]).p;
+  assert.doesNotThrow(() => validateGuardPresentation(policy(neutral, onlyCredDef), independent, onlyCredDef));
+  reg.issue(randomScalar());
+  assert.doesNotThrow(() => validateGuardPresentation(policy(q), p, ctx));
+  assert.doesNotThrow(() => validateGuardPresentation(policy(active), covered, ctx));
+  assert.notEqual(covered.versions['0xreg'], reg.h.values.length - 1);
+  reg.revoke(members[0]!);
+  assert.doesNotThrow(() => validateGuardPresentation(policy(q), p, ctx));
+  assert.equal(checkFreshness(p, 'co-stable', 'group', ctx).fresh, false);
+  const stableQuery = 'exists x in S. Revoked(x)';
+  const stable = run(stableQuery, ctx, []).p;
+  reg.revoke(members[1]!);
+  assert.doesNotThrow(() => validateGuardPresentation(policy(stableQuery), stable, ctx));
+  assert.doesNotThrow(() => validateGuardPresentation(policy(neutral, onlyCredDef), independent, onlyCredDef));
+});
+
+
+test('public proofs authenticate every claimed history version', async () => {
+  const { reg, ctx, members } = await world();
+  reg.revoke(members[0]!);
+  const query = 'exists x in S. Revoked(x)';
+  const p = run(query, ctx, []).p;
+  const policy: PolicyRef = { policyId: 'test-policy', query, bindings: [...ctx.bindings] };
+  for (const v of [reg.h.values.length, -1, 0.5, Number.NaN]) {
+    const bad = { ...p, versions: { ...p.versions, '0xreg': v } };
+    assert.equal(verifyPresentation(parse(query), bad, ctx).ok, false);
+    assert.throws(() => validateGuardPresentation(policy, bad, ctx), /invalid bound version/);
+  }
+  const unknown = { ...p, versions: { ...p.versions, unknown: 0 } };
+  assert.equal(verifyPresentation(parse(query), unknown, ctx).ok, false);
+  reg.issue(randomScalar());
+  assert.doesNotThrow(() => validateGuardPresentation(policy, p, ctx));
+});

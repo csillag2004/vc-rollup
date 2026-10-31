@@ -19,6 +19,22 @@ export const ACTION = { issue: 0, revoke: 1, present: 2 } as const;
 
 export interface PolicyRef { policyId: string; query: string; bindings: [string, Binding][] }
 
+/** Validate the proof before the trusted updater supplies its hash and CAS versions. */
+export function validateGuardPresentation(policy: PolicyRef, p: Presentation, ctx: PublicContext) {
+  if (p.query !== policy.query) throw new Error('guard proof rejected: it presents another query');
+  const verified = verifyPresentation(parse(policy.query), p, ctx);
+  if (!verified.ok) throw new Error(`guard proof rejected: ${verified.reason}`);
+  if (verified.cas === 'global') {
+    // CredDef bindings are skipped by the contract. Every registry used by this proof must
+    // also have a registry or group binding so that the transaction checks its version.
+    const covered = new Set([...ctx.bindings.values()].flatMap((b) => b.kind === 'creddef' ? [] : [b.registryId]));
+    for (const id of Object.keys(p.versions)) {
+      if (!covered.has(id)) throw new Error(`guard proof rejected: registry ${id} has no CAS binding`);
+    }
+  }
+  return verified;
+}
+
 /** public context for a query: histories of every registry it may touch, read from the ledger */
 export async function loadContext(d: Deployment, bindings: [string, Binding][], extraRegistries: string[] = []): Promise<PublicContext> {
   const ids = new Set(extraRegistries);
@@ -158,8 +174,28 @@ export class Issuer {
 
   /** expected versions in binding order: group versions (group CAS) or registry versions at the bound state */
   async guardFor(policy: PolicyRef, p: Presentation) {
+    const registered = await this.c('policies').getPolicy!(policy.policyId);
     const an = analyse(parse(policy.query));
+    if (registered.query !== policy.query || Number(registered.class) !== CLASS_ID[an.class]
+      || Number(registered.casMode) !== CAS_ID[an.cas] || registered.bindings.length !== policy.bindings.length) {
+      throw new Error('guard policy does not match the registered policy');
+    }
+    for (const [i, [name, b]] of policy.bindings.entries()) {
+      const stored = registered.bindings[i];
+      const target = b.kind === 'group' ? b.groupId : b.kind === 'registry' ? b.registryId : b.credDefId;
+      if (stored.name !== ethers.encodeBytes32String(name) || Number(stored.kind) !== KIND_ID[b.kind] || stored.target !== target) {
+        throw new Error('guard bindings do not match the registered policy');
+      }
+      if (b.kind === 'group') {
+        const actual = await readGroup(this.d, b.groupId);
+        if (actual.kind !== 'group' || actual.registryId !== b.registryId
+          || actual.members.length !== b.members.length || actual.members.some((y, j) => y !== b.members[j])) {
+          throw new Error('guard group does not match the ledger');
+        }
+      }
+    }
     const ctx = await loadContext(this.d, policy.bindings, Object.keys(p.versions));
+    validateGuardPresentation(policy, p, ctx);
     const expected = policy.bindings.map(([, b]) => {
       if (b.kind === 'creddef') return 0n;
       const h = ctx.registries.get(b.registryId)!;
@@ -176,11 +212,8 @@ export class Issuer {
    * update with the versions the proof was bound to; the contract does the compare-and-swap.
    */
   async guardedRevoke(registryId: string, y: bigint, policy: PolicyRef, p: Presentation): Promise<ethers.TransactionReceipt> {
-    const ctx = await loadContext(this.d, policy.bindings, Object.keys(p.versions));
-    const v = verifyPresentation(parse(policy.query), p, ctx);
-    if (!v.ok) throw new Error(`guard proof rejected: ${v.reason}`);
-    const h = await readHistory(this.d, registryId);
     const g = await this.guardFor(policy, p);
+    const h = await readHistory(this.d, registryId);
     return (await this.c('state').guardedRevoke!(...this.revokeArgs(registryId, h, y), g)).wait();
   }
 

@@ -120,7 +120,9 @@ contract StateRegistryTest is Test {
         (bytes memory a, bytes memory r, bytes memory w) = _revokeValues(y);
         vm.prank(alice);
         registry.revoke(regId, bytes32(y), a, r, w);
-        curA = a; curR = r; curW = w;
+        curA = a;
+        curR = r;
+        curW = w;
     }
 
     function _members(uint256 a, uint256 b) internal pure returns (bytes32[] memory m) {
@@ -131,7 +133,9 @@ contract StateRegistryTest is Test {
 
     function _groupWitness(bytes32[] memory members) internal view returns (bytes memory) {
         uint256 p = 1;
-        for (uint256 i = 0; i < members.length; i++) p = mulmod(p, addmod(uint256(members[i]), ALPHA, BLS.R), BLS.R);
+        for (uint256 i = 0; i < members.length; i++) {
+            p = mulmod(p, addmod(uint256(members[i]), ALPHA, BLS.R), BLS.R);
+        }
         return BLS.g1Mul(curI, BLS.frInv(p));
     }
 
@@ -359,7 +363,9 @@ contract StateRegistryTest is Test {
     function test_createGroupTooLargeReverts() public {
         (, bytes[] memory p2) = _srs(SRS_DEGREE);
         bytes32[] memory m = new bytes32[](5);
-        for (uint256 i = 0; i < 5; i++) m[i] = bytes32(i + 1);
+        for (uint256 i = 0; i < 5; i++) {
+            m[i] = bytes32(i + 1);
+        }
         vm.prank(alice);
         vm.expectRevert(abi.encodeWithSelector(StateRegistry.GroupTooLarge.selector, 5, SRS_DEGREE));
         registry.createGroup(regId, LABEL, m, curI, p2);
@@ -384,10 +390,18 @@ contract StateRegistryTest is Test {
     function test_policyCasModeTooWeakReverts() public {
         PolicyRegistry.Binding[] memory b = new PolicyRegistry.Binding[](1);
         b[0] = PolicyRegistry.Binding({name: "R", kind: PolicyRegistry.BindingKind.Registry, target: regId});
-        vm.expectRevert(abi.encodeWithSelector(PolicyRegistry.CasModeTooWeak.selector, PolicyRegistry.CasMode.None, PolicyRegistry.CasMode.Global));
-        policies.registerPolicy("forall x in Issued. NotRevoked(x)", PolicyRegistry.Class.CoStable, PolicyRegistry.CasMode.None, b);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                PolicyRegistry.CasModeTooWeak.selector, PolicyRegistry.CasMode.None, PolicyRegistry.CasMode.Global
+            )
+        );
+        policies.registerPolicy(
+            "forall x in Issued. NotRevoked(x)", PolicyRegistry.Class.CoStable, PolicyRegistry.CasMode.None, b
+        );
         vm.expectRevert(abi.encodeWithSelector(PolicyRegistry.GroupModeNeedsGroups.selector, 0));
-        policies.registerPolicy("forall x in Issued. NotRevoked(x)", PolicyRegistry.Class.CoStable, PolicyRegistry.CasMode.Group, b);
+        policies.registerPolicy(
+            "forall x in Issued. NotRevoked(x)", PolicyRegistry.Class.CoStable, PolicyRegistry.CasMode.Group, b
+        );
     }
 
     function test_bindPolicyOnlyIssuer() public {
@@ -418,7 +432,9 @@ contract StateRegistryTest is Test {
         (a, r, w) = _revokeValues(Y1);
         vm.prank(alice);
         registry.guardedRevoke(regId, bytes32(Y1), a, r, w, _guard(p, gv));
-        curA = a; curR = r; curW = w;
+        curA = a;
+        curR = r;
+        curW = w;
         // Bob ugyanarra a verzióra kötött guarddal: elutasítva
         (a, r, w) = _revokeValues(Y2);
         vm.prank(alice);
@@ -485,7 +501,9 @@ contract StateRegistryTest is Test {
         PolicyRegistry.Binding[] memory b = new PolicyRegistry.Binding[](1);
         b[0] = PolicyRegistry.Binding({name: "M", kind: PolicyRegistry.BindingKind.Group, target: g});
         vm.prank(alice);
-        bytes32 p = policies.registerPolicy("exists x in M. Revoked(x)", PolicyRegistry.Class.Stable, PolicyRegistry.CasMode.None, b);
+        bytes32 p = policies.registerPolicy(
+            "exists x in M. Revoked(x)", PolicyRegistry.Class.Stable, PolicyRegistry.CasMode.None, b
+        );
         vm.prank(alice);
         policies.bindPolicy(credDefId, PolicyRegistry.Action.Issue, p);
 

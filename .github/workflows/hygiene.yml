@@ -1,0 +1,18 @@
+name: Publication hygiene
+permissions: {}
+on: [push, pull_request, workflow_dispatch]
+jobs:
+  hygiene:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Secrets in history
+        run: bash scripts/secrets.sh
+      - name: Publication tree and history
+        run: python3 scripts/hygiene.py

@@ -16,7 +16,7 @@ import { deployAll, revertName, type Deployment } from '../src/chain/client.ts';
 import { Issuer, Holder, Verifier, readGroup, type PolicyRef } from '../src/actors/actors.ts';
 import type { Binding } from '../src/ql/compile.ts';
 
-const RPC = process.argv[2] ?? 'http://127.0.0.1:8545';
+const RPC = process.env.RPC ?? 'http://127.0.0.1:8545';
 // anvil's first default account (a public test key)
 const KEYS = ['0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'];
 
@@ -104,9 +104,10 @@ export async function runFlatReservation(rpc = RPC, opts: FlatOptions = {}): Pro
   const lp = await c.bob.present(loserQ, c.policy.bindings, 'bob-3');
   const lv = await verifier.verify(loserQ, c.policy.bindings, lp);
   say(`loser's proof ∃x∈S.Revoked(x): valid ${lv.ok}, class ${lv.class}`);
-  await landlord.revoke(c.reg, c.ys[2]!).catch(() => undefined); // policy bound: unguarded revoke refused
   const extra = await landlord.issue(c.reg, ['flat-cas', 'Dave'], c.carol.linkSecret);
-  void extra;
+  const laterPolicy = await landlord.registerPolicy(loserQ, c.policy.bindings, 'revoke');
+  await landlord.guardedRevoke(c.reg, extra.scalars[0]!, laterPolicy, lp);
+  say('later update: landlord binds the stable taken-flat policy and revokes a newly issued credential outside S');
   const lv2 = await verifier.verify(loserQ, c.policy.bindings, lp);
   say(`loser's proof after later updates: valid ${lv2.ok && lv2.fresh}`);
 

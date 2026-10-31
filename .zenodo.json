@@ -1,0 +1,25 @@
+{
+  "title": "vc-rollup: companion artifact for Joint anonymized issuance and revocation for complex verifiable credential chains",
+  "upload_type": "software",
+  "description": "Companion artifact for the 2026 TDK paper by Kocsis Csillag Kamilla. Implements credential query proofs, three accumulators, hidden issuance and atomic compare-and-swap updates under a trusted issuer/updater model. Includes local reproduction and historical OP Sepolia evidence; see design/ARTIFACT-CONTRACT.md for scope and limitations.",
+  "creators": [
+    {
+      "name": "Kocsis, Csillag Kamilla"
+    }
+  ],
+  "license": "MIT",
+  "keywords": [
+    "verifiable credentials",
+    "BBS",
+    "accumulators",
+    "compare-and-swap",
+    "EIP-2537"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://github.com/csillag2004/vc-rollup",
+      "relation": "isSupplementTo",
+      "scheme": "url"
+    }
+  ]
+}

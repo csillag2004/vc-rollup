@@ -9,17 +9,16 @@ import {BLS} from "./lib/BLS.sol";
 /// Verify on write: minden frissítést a contract EIP-2537 pairinggel ellenőriz,
 /// a guardolt frissítéseknél pedig a policy szerinti compare-and-swap fut.
 contract StateRegistry {
-
     struct Registry {
         bytes32 credDefId;
         bytes32 label;
-        bytes A;        // aktív oldal, G1: V0^(1/P_Rev(α)) (static add)
-        bytes Rtilde;   // visszavont halmaz, G2: g̃^(P_Rev(α))
-        bytes I;        // kiadott halmaz, G1: g^(P_Iss(α))
-        bytes V0;       // A kezdőértéke, G1
-        bytes Qtilde;   // akkumulátor kulcs, G2: g̃^α
-        bytes Q;        // akkumulátor kulcs, G1: g^α
-        bytes WIR;      // R̃ ⊆ I tanú, G1: g^(P_Iss/P_Rev(α))
+        bytes A; // aktív oldal, G1: V0^(1/P_Rev(α)) (static add)
+        bytes Rtilde; // visszavont halmaz, G2: g̃^(P_Rev(α))
+        bytes I; // kiadott halmaz, G1: g^(P_Iss(α))
+        bytes V0; // A kezdőértéke, G1
+        bytes Qtilde; // akkumulátor kulcs, G2: g̃^α
+        bytes Q; // akkumulátor kulcs, G1: g^α
+        bytes WIR; // R̃ ⊆ I tanú, G1: g^(P_Iss/P_Rev(α))
         uint64 version;
         bytes32 g1SrsHash;
         bytes32 g2SrsHash;
@@ -56,17 +55,29 @@ contract StateRegistry {
 
     mapping(bytes32 registryId => Registry) private registries;
     mapping(bytes32 credDefId => bytes32[]) private registriesOfCredDef;
-    mapping(bytes32 registryId => mapping(uint64 version => bytes32)) private valuesHashes;      // keccak(A, R̃, I)
-    mapping(bytes32 registryId => mapping(bytes32 y => uint64)) private revokedAtVersion;        // 0 = nincs visszavonva
-    mapping(bytes32 registryId => bytes32[]) private revokedLog;                                  // append-only
+    mapping(bytes32 registryId => mapping(uint64 version => bytes32)) private valuesHashes; // keccak(A, R̃, I)
+    mapping(bytes32 registryId => mapping(bytes32 y => uint64)) private revokedAtVersion; // 0 = nincs visszavonva
+    mapping(bytes32 registryId => bytes32[]) private revokedLog; // append-only
     mapping(bytes32 groupId => Group) private groups;
 
-    event RegistryCreated(bytes32 indexed registryId, bytes32 indexed credDefId, bytes32 label, bytes V0, bytes Qtilde, bytes Q);
+    event RegistryCreated(
+        bytes32 indexed registryId, bytes32 indexed credDefId, bytes32 label, bytes V0, bytes Qtilde, bytes Q
+    );
     event SrsPublished(bytes32 indexed registryId, uint32 degree, bytes[] g1Powers, bytes[] g2Powers);
     // guardDigest = 0 a nem őrzött frissítésnél; egyébként keccak256(abi.encode(policyId, proofHash))
     event Issued(bytes32 indexed registryId, uint64 indexed version, bytes newI, bytes newWIR, bytes32 guardDigest);
-    event Revoked(bytes32 indexed registryId, uint64 indexed version, bytes32 indexed y, bytes newA, bytes newRtilde, bytes newWIR, bytes32 guardDigest);
-    event GroupCreated(bytes32 indexed groupId, bytes32 indexed registryId, address indexed creator, bytes32 label, bytes32[] members);
+    event Revoked(
+        bytes32 indexed registryId,
+        uint64 indexed version,
+        bytes32 indexed y,
+        bytes newA,
+        bytes newRtilde,
+        bytes newWIR,
+        bytes32 guardDigest
+    );
+    event GroupCreated(
+        bytes32 indexed groupId, bytes32 indexed registryId, address indexed creator, bytes32 label, bytes32[] members
+    );
 
     error ZeroAddress();
     error UnknownCredDef(bytes32 credDefId);
@@ -118,7 +129,6 @@ contract StateRegistry {
         _;
     }
 
-
     ///LÉTREHOZÁS
     function createRegistry(
         bytes32 credDefId,
@@ -159,7 +169,8 @@ contract StateRegistry {
     /// SRS: g^(α^i) és g̃^(α^i), i = 0..n. Szerkezetét két kötegelt pairing ellenőrzi:
     /// e(Σρ_i·g1[i+1], g̃) = e(Σρ_i·g1[i], Q̃) és e(Σρ_i·g1[i], g̃) = e(g, Σρ_i·g2[i]).
     function publishSrs(bytes32 registryId, bytes[] calldata g1Powers, bytes[] calldata g2Powers)
-        external onlyIssuer(registryId)
+        external
+        onlyIssuer(registryId)
     {
         Registry storage r = registries[registryId];
         if (r.g1SrsHash != bytes32(0)) revert SrsAlreadyPublished();
@@ -184,10 +195,11 @@ contract StateRegistry {
         emit SrsPublished(registryId, r.srsDegree, g1Powers, g2Powers);
     }
 
-
     ///KIADÁS
     function issueUpdate(bytes32 registryId, IssueStep calldata step)
-        external onlyIssuer(registryId) whenInitialized(registryId)
+        external
+        onlyIssuer(registryId)
+        whenInitialized(registryId)
     {
         bytes32 credDefId = registries[registryId].credDefId;
         bytes32 bound = policyRegistry.boundPolicy(credDefId, PolicyRegistry.Action.Issue);
@@ -196,21 +208,19 @@ contract StateRegistry {
     }
 
     function guardedIssueUpdate(bytes32 registryId, IssueStep calldata step, Guard calldata guard)
-        external onlyIssuer(registryId) whenInitialized(registryId)
+        external
+        onlyIssuer(registryId)
+        whenInitialized(registryId)
     {
         bytes32 digest = _checkGuard(registries[registryId].credDefId, PolicyRegistry.Action.Issue, guard);
         _applyIssue(registryId, step, digest);
     }
 
-
     ///VISSZAVONÁS
-    function revoke(
-        bytes32 registryId,
-        bytes32 y,
-        bytes calldata newA,
-        bytes calldata newRtilde,
-        bytes calldata newWIR
-    ) external onlyIssuer(registryId) {
+    function revoke(bytes32 registryId, bytes32 y, bytes calldata newA, bytes calldata newRtilde, bytes calldata newWIR)
+        external
+        onlyIssuer(registryId)
+    {
         bytes32 credDefId = registries[registryId].credDefId;
         bytes32 bound = policyRegistry.boundPolicy(credDefId, PolicyRegistry.Action.Revoke);
         if (bound != bytes32(0)) revert PolicyRequired(bound);
@@ -228,7 +238,6 @@ contract StateRegistry {
         bytes32 digest = _checkGuard(registries[registryId].credDefId, PolicyRegistry.Action.Revoke, guard);
         _applyRevoke(registryId, y, newA, newRtilde, newWIR, digest);
     }
-
 
     ///CSOPORTOK
     /// Csak kiadott ID-k: e(W_S, [P_S]_2) = e(I, g̃), ahol [P_S]_2-t a contract számolja a tagokból és a G2 SRS-ből.
@@ -276,7 +285,6 @@ contract StateRegistry {
         }
     }
 
-
     ///OLVASÓ FÜGGVÉNYEK
     function getRegistry(bytes32 registryId) external view returns (Registry memory) {
         if (registries[registryId].createdAt == 0) revert UnknownRegistry(registryId);
@@ -298,7 +306,8 @@ contract StateRegistry {
 
     /// Az állapot és a version, amire egy proof köthető.
     function getValues(bytes32 registryId)
-        external view
+        external
+        view
         returns (bytes memory A, bytes memory Rtilde, bytes memory I, bytes memory WIR, uint64 version)
     {
         Registry storage r = registries[registryId];
@@ -325,16 +334,23 @@ contract StateRegistry {
     }
 
     /// Lapozható olvasás a holderek receipt-frissítéséhez.
-    function getRevokedLog(bytes32 registryId, uint256 start, uint256 count) external view returns (bytes32[] memory out) {
+    function getRevokedLog(bytes32 registryId, uint256 start, uint256 count)
+        external
+        view
+        returns (bytes32[] memory out)
+    {
         bytes32[] storage log = revokedLog[registryId];
         if (start > log.length) revert IndexOutOfRange(start);
         uint256 end = start + count > log.length ? log.length : start + count;
         out = new bytes32[](end - start);
-        for (uint256 i = start; i < end; i++) out[i - start] = log[i];
+        for (uint256 i = start; i < end; i++) {
+            out[i - start] = log[i];
+        }
     }
 
     function getGroup(bytes32 groupId)
-        external view
+        external
+        view
         returns (bytes32 registryId, address creator, uint256 createdAt, bytes32[] memory members)
     {
         Group storage g = groups[groupId];
@@ -360,14 +376,17 @@ contract StateRegistry {
 
     /// a kiadási Schnorr-bizonyítás kihívása; az off-chain kód ugyanezt számolja
     function issueChallenge(bytes32 registryId, bytes calldata newI, bytes calldata T, bytes calldata R)
-        public view returns (uint256)
+        public
+        view
+        returns (uint256)
     {
         Registry storage r = registries[registryId];
-        return uint256(keccak256(abi.encode(
-            "revoq/issue/v1", block.chainid, address(this), registryId, r.version, r.I, newI, T, R
-        ))) % BLS.R;
+        return uint256(
+            keccak256(
+            abi.encode("revoq/issue/v1", block.chainid, address(this), registryId, r.version, r.I, newI, T, R)
+        )
+        ) % BLS.R;
     }
-
 
     ///SEGÉDFÜGGVÉNYEK
     function _valuesHash(Registry storage r) private view returns (bytes32) {
@@ -400,8 +419,10 @@ contract StateRegistry {
         uint256 c = issueChallenge(registryId, s.newI, s.T, s.R);
         bytes[] memory ps = new bytes[](2);
         uint256[] memory ss = new uint256[](2);
-        ps[0] = r.I; ss[0] = s.z % BLS.R;
-        ps[1] = s.T; ss[1] = BLS.R - c;
+        ps[0] = r.I;
+        ss[0] = s.z % BLS.R;
+        ps[1] = s.T;
+        ss[1] = BLS.R - c;
         if (keccak256(BLS.g1Msm(ps, ss)) != keccak256(s.R)) revert IssueProofFailed();
 
         bytes memory iMinusT = BLS.g1Add(s.newI, BLS.g1Neg(s.T));
@@ -410,7 +431,7 @@ contract StateRegistry {
 
         r.I = s.newI;
         r.WIR = s.newWIR;
-        r.version += 1;                                  // a kiadás is új version
+        r.version += 1; // a kiadás is új version
         valuesHashes[registryId][r.version] = _valuesHash(r);
         emit Issued(registryId, r.version, s.newI, s.newWIR, guardDigest);
     }
@@ -436,8 +457,10 @@ contract StateRegistry {
         Registry storage r = registries[registryId];
         bytes[] memory ps = new bytes[](2);
         uint256[] memory ss = new uint256[](2);
-        ps[0] = BLS.g2(); ss[0] = uint256(y);
-        ps[1] = r.Qtilde; ss[1] = 1;
+        ps[0] = BLS.g2();
+        ss[0] = uint256(y);
+        ps[1] = r.Qtilde;
+        ss[1] = 1;
         bytes memory gyQ = BLS.g2Msm(ps, ss);
 
         if (!BLS.pairingEq(newA, gyQ, r.A, BLS.g2())) revert StepCheckFailed();
@@ -460,7 +483,9 @@ contract StateRegistry {
     /// A CAS-módot a policy adja: None = nincs összehasonlítás (stable guard),
     /// Group = minden kötött csoport verziója, Global = minden kötött registry (vagy a csoport registryjének) verziója.
     function _checkGuard(bytes32 credDefId, PolicyRegistry.Action action, Guard calldata guard)
-        private view returns (bytes32)
+        private
+        view
+        returns (bytes32)
     {
         bytes32 bound = policyRegistry.boundPolicy(credDefId, action);
         if (bound != bytes32(0) && bound != guard.policyId) revert WrongPolicy(bound, guard.policyId);
@@ -477,7 +502,8 @@ contract StateRegistry {
                     uint64 gv = groupVersion(targets[i]);
                     if (gv != expected) revert StaleGroupVersion(targets[i], expected, gv);
                 } else {
-                    bytes32 regId = kinds[i] == PolicyRegistry.BindingKind.Group ? _groupRegistry(targets[i]) : targets[i];
+                    bytes32 regId =
+                        kinds[i] == PolicyRegistry.BindingKind.Group ? _groupRegistry(targets[i]) : targets[i];
                     if (registries[regId].createdAt == 0) revert UnknownRegistry(regId);
                     uint64 current = registries[regId].version;
                     if (current != expected) revert StaleVersion(i, expected, current);
@@ -497,12 +523,15 @@ contract StateRegistry {
     function _groupPolyG2(bytes32[] calldata members, bytes[] calldata g2Powers) private view returns (bytes memory) {
         uint256[] memory c = BLS.setPolyCoeffs(members);
         bytes[] memory ps = new bytes[](c.length);
-        for (uint256 j = 0; j < c.length; j++) ps[j] = g2Powers[j];
+        for (uint256 j = 0; j < c.length; j++) {
+            ps[j] = g2Powers[j];
+        }
         return BLS.g2Msm(ps, c);
     }
 
     function _checkSrsStructure(bytes[] calldata g1p, bytes[] calldata g2p, bytes memory Qtilde, bytes32 seed)
-        private view
+        private
+        view
     {
         uint256 n = g1p.length; // n = fok + 1
         bytes[] memory lowG1 = new bytes[](n - 1);

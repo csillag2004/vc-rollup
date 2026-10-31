@@ -8,16 +8,32 @@ import {CredDefRegistry, IEthereumDIDRegistry} from "./CredDefRegistry.sol";
 /// a verifier off-chain újraszámolja. A contract annyit kényszerít ki, hogy a CAS-mód
 /// ne legyen gyengébb annál, amit a deklarált osztály és a kötések fajtája megkövetel.
 contract PolicyRegistry {
-
-    enum Class { StateIndependent, Stable, CoStable, Volatile }
-    enum CasMode { None, Group, Global }
-    enum BindingKind { Group, Registry, CredDef }
-    enum Action { Issue, Revoke, Present }
+    enum Class {
+        StateIndependent,
+        Stable,
+        CoStable,
+        Volatile
+    }
+    enum CasMode {
+        None,
+        Group,
+        Global
+    }
+    enum BindingKind {
+        Group,
+        Registry,
+        CredDef
+    }
+    enum Action {
+        Issue,
+        Revoke,
+        Present
+    }
 
     struct Binding {
-        bytes32 name;       // a query-ben használt név (rövid string bytes32-ként)
+        bytes32 name; // a query-ben használt név (rövid string bytes32-ként)
         BindingKind kind;
-        bytes32 target;     // groupId, registryId vagy credDefId
+        bytes32 target; // groupId, registryId vagy credDefId
     }
 
     struct Policy {
@@ -36,7 +52,9 @@ contract PolicyRegistry {
     mapping(bytes32 policyId => Policy) private policies;
     mapping(bytes32 credDefId => mapping(Action => bytes32 policyId)) private bound;
 
-    event PolicyRegistered(bytes32 indexed policyId, address indexed author, string query, Class class, CasMode casMode, Binding[] bindings);
+    event PolicyRegistered(
+        bytes32 indexed policyId, address indexed author, string query, Class class, CasMode casMode, Binding[] bindings
+    );
     event PolicyBound(bytes32 indexed credDefId, Action indexed action, bytes32 indexed policyId);
 
     error ZeroAddress();
@@ -65,7 +83,8 @@ contract PolicyRegistry {
     }
 
     function registerPolicy(string calldata query, Class class, CasMode casMode, Binding[] calldata bindings)
-        external returns (bytes32 policyId)
+        external
+        returns (bytes32 policyId)
     {
         if (bytes(query).length == 0) revert EmptyQuery();
         for (uint256 i = 0; i < bindings.length; i++) {
@@ -85,7 +104,9 @@ contract PolicyRegistry {
         p.queryHash = keccak256(bytes(query));
         p.class = class;
         p.casMode = casMode;
-        for (uint256 i = 0; i < bindings.length; i++) p.bindings.push(bindings[i]);
+        for (uint256 i = 0; i < bindings.length; i++) {
+            p.bindings.push(bindings[i]);
+        }
         p.createdAt = block.timestamp;
 
         emit PolicyRegistered(policyId, msg.sender, query, class, casMode, bindings);
@@ -118,7 +139,8 @@ contract PolicyRegistry {
 
     /// amit a StateRegistry-nek a guard ellenőrzéséhez tudnia kell
     function guardInfo(bytes32 policyId)
-        external view
+        external
+        view
         returns (CasMode casMode, BindingKind[] memory kinds, bytes32[] memory targets)
     {
         Policy storage p = policies[policyId];
