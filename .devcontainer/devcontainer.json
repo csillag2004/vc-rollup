@@ -1,0 +1,10 @@
+{
+  "name": "vc-rollup",
+  "build": { "dockerfile": "../Dockerfile", "context": ".." },
+  "overrideCommand": true,
+  "workspaceFolder": "/artifact",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/artifact,type=bind",
+  "features": { "ghcr.io/devcontainers/features/docker-in-docker:2": {} },
+  "customizations": { "vscode": { "extensions": ["JuanBlanco.solidity", "leanprover.lean4", "rust-lang.rust-analyzer"] } },
+  "postCreateCommand": "npm --prefix offchain ci && bash scripts/install-contract-deps.sh && just --list"
+}
