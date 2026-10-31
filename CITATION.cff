@@ -1,0 +1,12 @@
+cff-version: 1.2.0
+message: "Please cite this software when using the companion artifact."
+type: software
+title: "vc-rollup: companion artifact for Joint anonymized issuance and revocation for complex verifiable credential chains"
+authors:
+  - family-names: Kocsis
+    given-names: Csillag Kamilla
+  - family-names: Farkas
+    given-names: Martin
+repository-code: "https://github.com/csillag2004/vc-rollup"
+license: MIT
+abstract: "Companion implementation of credential query proofs, three accumulators, public issuance and ledger-enforced public guarded updates, with private presentations evaluated off-chain."

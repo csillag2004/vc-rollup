@@ -1,19 +1,13 @@
-name: CI
-
+name: Artifact CI
 permissions: {}
-
 on:
   push:
   pull_request:
   workflow_dispatch:
-
-env:
-  FOUNDRY_PROFILE: ci
-
 jobs:
-  check:
-    name: Foundry project
-    runs-on: ubuntu-latest
+  artifact:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     permissions:
       contents: read
     steps:
@@ -21,18 +15,48 @@ jobs:
         with:
           persist-credentials: false
           submodules: recursive
-
-      - name: Install Foundry
-        uses: foundry-rs/foundry-toolchain@v1
-
-      - name: Show Forge version
-        run: forge --version
-
-      - name: Run Forge fmt
-        run: forge fmt --check
-
-      - name: Run Forge build
-        run: forge build --sizes
-
-      - name: Run Forge tests
-        run: forge test -vvv
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26.7.0'
+          cache: npm
+          cache-dependency-path: offchain/package-lock.json
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.8.6
+      - name: Install Rust and just
+        run: |
+          rustup toolchain install 1.94.1 --profile minimal
+          cargo install just --version 1.58.0 --locked
+      - run: just install
+      - run: just test
+      - name: Reproduce locally even with an inherited live target
+        run: just reproduce --smoke
+        env:
+          TARGET: op-sepolia
+      - run: just demo --smoke
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reproduction-and-demo
+          path: |
+            out/*.csv
+            out/*.json
+            out/*.md
+            out/*.log
+            out/*.tap
+            out/demo/
+            out/evaluation/
+          if-no-files-found: warn
+  container:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+          submodules: recursive
+      - run: docker build --build-arg ARTIFACT_REVISION="$GITHUB_SHA" -t vc-rollup-artifact .
+      - name: Reproduce in the container
+        run: docker run --rm vc-rollup-artifact reproduce --smoke

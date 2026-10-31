@@ -1,5 +1,7 @@
 # Deployments
 
+Historical evidence from 2026-10-29. These records describe the then-deployed CAS/hash-only interface. No redeployment or fresh testnet validation is claimed by this submission artifact. Local reproduction and its provenance are separate; see [ARTIFACT-CONTRACT.md](ARTIFACT-CONTRACT.md).
+
 ## OP Sepolia (chain id 11155420), 2026-10-29
 
 Deployed with `script/Deploy.s.sol` from branch `tdk/full-implementation`; deployer

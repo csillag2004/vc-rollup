@@ -14,7 +14,8 @@ import {BLS} from "../src/lib/BLS.sol";
 contract Deploy is Script {
     function run() external {
         // a verify-on-write ellenőrzésekhez EIP-2537 kell: e(g, g̃) · e(-g, g̃) = 1
-        (bool ok, bytes memory out) = BLS.PAIRING.staticcall(abi.encodePacked(BLS.g1(), BLS.g2(), BLS.g1Neg(BLS.g1()), BLS.g2()));
+        (bool ok, bytes memory out) =
+            BLS.PAIRING.staticcall(abi.encodePacked(BLS.g1(), BLS.g2(), BLS.g1Neg(BLS.g1()), BLS.g2()));
         require(ok && out.length == 32 && uint256(bytes32(out)) == 1, "no EIP-2537 pairing precompile on this chain");
 
         address did = vm.envOr("DID_REGISTRY", address(0));

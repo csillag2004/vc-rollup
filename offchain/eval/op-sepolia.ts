@@ -50,7 +50,7 @@ async function main(): Promise<void> {
     '| Check | Result |',
     '|---|---|',
     `| naive profile books the flat twice | ${result.naiveDoubleBooking} |`,
-    `| CAS profile rejects the second guarded revocation | ${result.casRejected ?? 'not rejected'} |`,
+    `| Public-guard profile rejects the second guarded revocation | ${result.guardRejected ?? 'not rejected'} |`,
     `| loser's proof ∃x∈S. Revoked(x) valid | ${result.loserProofValid} |`,
     `| loser's proof still valid after later updates | ${result.loserProofStillValidLater} |`,
     `| holder proves "one of S, revoked" without saying which | ${result.holderReservationProof} |`,

@@ -13,8 +13,9 @@ command -v lake >/dev/null || {
 
 sha256sum --check --strict frozen/spec.sha256
 
+mapfile -d '' proof_files < <(find . -path './.lake' -prune -o -path './tools' -prune -o -type f -name '*.lean' -print0)
 if grep -nE '\b(sorry|admit|native_decide|axiom|unsafe|implemented_by|extern)\b|debug\.skipKernelTC' \
-  -- *.lean; then
+  -- "${proof_files[@]}"; then
   echo "Forbidden proof mechanism in the lines above." >&2
   exit 1
 fi

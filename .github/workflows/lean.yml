@@ -7,16 +7,19 @@ on:
     paths:
       - "verification/lean/**"
       - ".github/workflows/lean.yml"
+      - "scripts/lean.sh"
   pull_request:
     paths:
       - "verification/lean/**"
       - ".github/workflows/lean.yml"
+      - "scripts/lean.sh"
   workflow_dispatch:
 
 jobs:
   lake-build:
     name: Seal check and lake build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     permissions:
       contents: read
     defaults:

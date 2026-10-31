@@ -7,7 +7,7 @@ import * as bbs from '../src/crypto/bbs.ts';
 import { utf8ToBytes, randomScalar } from '../src/crypto/bls.ts';
 import { proofSize } from '../src/crypto/sigma.ts';
 
-export interface BenchRow { case: string; rule: string; proveMs: number; verifyMs: number; bytes: number }
+export interface BenchRow { case: string; rule: string; proveMs: number; verifyMs: number; bytes: number; proveSamplesMs: number[]; verifySamplesMs: number[]; proofSamplesBytes: number[] }
 
 function presentationBytes(p: Presentation): number {
   // points are compressed hex in the JSON; count bytes of points and scalars, not JSON syntax
@@ -54,19 +54,32 @@ async function setup(groupSize: number) {
 async function measure(caseName: string, rule: string, q: string, ctx: PublicContext, wallet: WalletCredential[], opts = {}, reps = 3): Promise<BenchRow> {
   const f = parse(q);
   let p!: Presentation;
-  let t0 = performance.now();
-  for (let i = 0; i < reps; i++) p = present(f, q, ctx, wallet, `n${i}`, opts);
-  const proveMs = (performance.now() - t0) / reps;
-  t0 = performance.now();
+  // Warm up the same proof shape before collecting independent wall-clock samples.
+  p = present(f, q, ctx, wallet, 'warmup', opts);
+  const warmup = verifyPresentation(f, p, ctx);
+  if (!warmup.ok) throw new Error(`${caseName}: ${warmup.reason}`);
+  const proveSamplesMs: number[] = [], verifySamplesMs: number[] = [];
+  const presentations: Presentation[] = [];
   for (let i = 0; i < reps; i++) {
-    const v = verifyPresentation(f, p, ctx);
+    const start = performance.now();
+    p = present(f, q, ctx, wallet, `n${i}`, opts);
+    proveSamplesMs.push(performance.now() - start);
+    presentations.push(p);
+  }
+  for (let i = 0; i < reps; i++) {
+    const start = performance.now();
+    const v = verifyPresentation(f, presentations[i]!, ctx);
+    verifySamplesMs.push(performance.now() - start);
     if (!v.ok) throw new Error(`${caseName}: ${v.reason}`);
   }
-  const verifyMs = (performance.now() - t0) / reps;
-  return { case: caseName, rule, proveMs, verifyMs, bytes: presentationBytes(p) };
+  const proveMs = proveSamplesMs.reduce((a, b) => a + b, 0) / reps;
+  const verifyMs = verifySamplesMs.reduce((a, b) => a + b, 0) / reps;
+  const proofSamplesBytes = presentations.map(presentationBytes);
+  const bytes = proofSamplesBytes.reduce((a, b) => a + b, 0) / reps;
+  return { case: caseName, rule, proveMs, verifyMs, bytes, proveSamplesMs, verifySamplesMs, proofSamplesBytes };
 }
 
-export async function runBench(): Promise<BenchRow[]> {
+export async function runBench(smoke = false): Promise<BenchRow[]> {
   const rows: BenchRow[] = [];
   const small = await setup(6);
   // the revoked wallet credential is the last of the six
@@ -75,11 +88,11 @@ export async function runBench(): Promise<BenchRow[]> {
   rows.push(await measure('one active credential', 'R-CRED-SIG + R-ATOM-NOTREVOKED', 'exists x in Presented. Sig(x, "Landlord") & Active(x)', small.ctx, active));
   rows.push(await measure('one revoked credential', 'R-CRED-SIG + R-ATOM-REVOKED (G2)', 'exists x in Presented. Sig(x, "Landlord") & Revoked(x)', small.ctx, revoked));
   rows.push(await measure('OR with a simulated branch', 'R-OR (CDS)', 'exists x in Presented. Sig(x, "Landlord") & (Revoked(x) | NotRevoked(x))', small.ctx, active));
-  for (const k of [1, 2, 3, 4]) {
+  for (const k of (smoke ? [1, 2] : [1, 2, 3, 4])) {
     rows.push(await measure(`at least ${k} active`, 'R-ATLEAST (k credentials + distinctness)', `atleast ${k} x in Presented. Sig(x, "Landlord") & Active(x)`, small.ctx, active));
   }
   rows.push(await measure('same holder, two credentials', 'R-CRED-EQ', 'exists x in Presented. exists y in Presented. Sig(x, "Landlord") & Sig(y, "Landlord") & SameHolder(x, y)', small.ctx, active));
-  for (const n of [4, 16, 64]) {
+  for (const n of (smoke ? [4] : [4, 16, 64])) {
     const s = await setup(n);
     const members = (s.ctx.bindings.get('S') as any).members as bigint[];
     const activeMembers = members.filter((y) => !s.reg.h.revokedAt.has(y));
@@ -94,7 +107,7 @@ export async function runBench(): Promise<BenchRow[]> {
 }
 
 export function benchTable(rows: BenchRow[]): string {
-  const lines = ['| Case | Rule | Prove (ms) | Verify (ms) | Size (bytes) |', '|---|---|---:|---:|---:|'];
+  const lines = ['| Case | Rule | Prove (ms) | Verify (ms) | Mean size (bytes) |', '|---|---|---:|---:|---:|'];
   for (const r of rows) lines.push(`| ${r.case} | ${r.rule} | ${r.proveMs.toFixed(1)} | ${r.verifyMs.toFixed(1)} | ${r.bytes} |`);
   return lines.join('\n');
 }

@@ -1,6 +1,8 @@
 # Paper coverage
 
-What the Lean model says about each lemma and design-level claim of [`content/03-proposed-approach.tex` at e53e483](https://github.com/BlackLight54/TDK26-Kocsis-Kamilla/blob/e53e4837cfaf28f11ea9cf69b7e9c7b3e206d22e/content/03-proposed-approach.tex). Theorem locations and axioms are in `THEOREMS.md`; the encoding and its assumptions are in `CONTRACT.md`.
+This historical mapping is not the current implementation coverage table. Use [CLAIM-EVIDENCE.md](../../design/CLAIM-EVIDENCE.md) and [ENFORCED-GUARDS.md](../../design/ENFORCED-GUARDS.md) for the restored public-guard implementation, its permanent policy bindings and unsupported private update guards. The sealed model remains unchanged.
+
+What the Lean model says about each lemma and design-level claim of the historical paper source `content/03-proposed-approach.tex`, revision `e53e4837cfaf28f11ea9cf69b7e9c7b3e206d22e` (private source, not included in this artifact). Theorem locations and axioms are in `THEOREMS.md`; the encoding and its assumptions are in `CONTRACT.md`.
 
 The findings for the author are in `paper-todos.json`. Its `todos` are ready-to-paste `\atodo[inline]{…}` notes, each backed by the theorems it names and placed by a LaTeX label of the chapter. Its `judgment` items are observations that no theorem backs; they need a supervisor's call before they become to-dos. To preview or insert the notes:
 

@@ -1,0 +1,3216 @@
+[
+  {
+    "description": "  The front end compiles a guard into a presented part, which the holder proves off-chain,\n  and a public part over groups and Issued, which the contract evaluates when the update\n  executes. The contract computes the class of both. A nonempty presented part\n  cannot be bound to an update, regardless of its class.",
+    "elements": [
+      {
+        "description": "",
+        "id": "the-contract-classifies-policies-and-rejects-unsupported-update-guards;exists-x-in-s.-revoked(x)",
+        "keyword": "Scenario Outline",
+        "line": 23,
+        "name": "exists x in S. Revoked(x)",
+        "steps": [
+          {
+            "result": {
+              "status": "passed",
+              "duration": 28636070
+            },
+            "keyword": "Before",
+            "hidden": true
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 250677108
+            },
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 8,
+            "name": "a landlord with a BBS key published in its DID document",
+            "match": {
+              "location": "features/steps/registry.steps.ts:13"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 105507532
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 9,
+            "name": "a schema \"Interest\" version \"1.0\" with attributes \"flat\" and \"name\"",
+            "match": {
+              "location": "features/steps/registry.steps.ts:17"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 104572617
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 10,
+            "name": "the landlord registers a CredDef for the schema \"Interest\"",
+            "match": {
+              "location": "features/steps/registry.steps.ts:23"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 765897050
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 11,
+            "name": "a revocation registry for the CredDef with a published SRS",
+            "match": {
+              "location": "features/steps/registry.steps.ts:33"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 972820162
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 12,
+            "name": "the landlord has issued interest credentials to Alice, Bob and Carol",
+            "match": {
+              "location": "features/steps/registry.steps.ts:37"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 156385395
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 13,
+            "name": "the group S = {Alice, Bob, Carol} is anchored on chain",
+            "match": {
+              "location": "features/steps/registry.steps.ts:51"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 178504856
+            },
+            "arguments": [],
+            "keyword": "When ",
+            "line": 16,
+            "name": "the policy 'exists x in S. Revoked(x)' is registered",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:181"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 38805456
+            },
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 17,
+            "name": "the contract classifies the presented part as \"state-independent\" and the public part as \"stable\"",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:185"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 92126675
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 18,
+            "name": "the front end computes the same classes",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:192"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 173090443
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 19,
+            "name": "the policy is supported for issuance updates",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:198"
+            }
+          }
+        ],
+        "tags": [],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "the-contract-classifies-policies-and-rejects-unsupported-update-guards;atleast-2-x-in-s.-revoked(x)",
+        "keyword": "Scenario Outline",
+        "line": 24,
+        "name": "atleast 2 x in S. Revoked(x)",
+        "steps": [
+          {
+            "result": {
+              "status": "passed",
+              "duration": 77329666
+            },
+            "keyword": "Before",
+            "hidden": true
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 152023344
+            },
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 8,
+            "name": "a landlord with a BBS key published in its DID document",
+            "match": {
+              "location": "features/steps/registry.steps.ts:13"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 145615367
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 9,
+            "name": "a schema \"Interest\" version \"1.0\" with attributes \"flat\" and \"name\"",
+            "match": {
+              "location": "features/steps/registry.steps.ts:17"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 115584213
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 10,
+            "name": "the landlord registers a CredDef for the schema \"Interest\"",
+            "match": {
+              "location": "features/steps/registry.steps.ts:23"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 538728334
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 11,
+            "name": "a revocation registry for the CredDef with a published SRS",
+            "match": {
+              "location": "features/steps/registry.steps.ts:33"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 984601924
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 12,
+            "name": "the landlord has issued interest credentials to Alice, Bob and Carol",
+            "match": {
+              "location": "features/steps/registry.steps.ts:37"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 111984497
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 13,
+            "name": "the group S = {Alice, Bob, Carol} is anchored on chain",
+            "match": {
+              "location": "features/steps/registry.steps.ts:51"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 103358654
+            },
+            "arguments": [],
+            "keyword": "When ",
+            "line": 16,
+            "name": "the policy 'atleast 2 x in S. Revoked(x)' is registered",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:181"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 23993509
+            },
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 17,
+            "name": "the contract classifies the presented part as \"state-independent\" and the public part as \"stable\"",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:185"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 23861902
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 18,
+            "name": "the front end computes the same classes",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:192"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 83175124
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 19,
+            "name": "the policy is supported for issuance updates",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:198"
+            }
+          }
+        ],
+        "tags": [],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "the-contract-classifies-policies-and-rejects-unsupported-update-guards;forall-x-in-s.-notrevoked(x)",
+        "keyword": "Scenario Outline",
+        "line": 25,
+        "name": "forall x in S. NotRevoked(x)",
+        "steps": [
+          {
+            "result": {
+              "status": "passed",
+              "duration": 15114641
+            },
+            "keyword": "Before",
+            "hidden": true
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 78555513
+            },
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 8,
+            "name": "a landlord with a BBS key published in its DID document",
+            "match": {
+              "location": "features/steps/registry.steps.ts:13"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 89385962
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 9,
+            "name": "a schema \"Interest\" version \"1.0\" with attributes \"flat\" and \"name\"",
+            "match": {
+              "location": "features/steps/registry.steps.ts:17"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 87481077
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 10,
+            "name": "the landlord registers a CredDef for the schema \"Interest\"",
+            "match": {
+              "location": "features/steps/registry.steps.ts:23"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 340657841
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 11,
+            "name": "a revocation registry for the CredDef with a published SRS",
+            "match": {
+              "location": "features/steps/registry.steps.ts:33"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 683518011
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 12,
+            "name": "the landlord has issued interest credentials to Alice, Bob and Carol",
+            "match": {
+              "location": "features/steps/registry.steps.ts:37"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 101064742
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 13,
+            "name": "the group S = {Alice, Bob, Carol} is anchored on chain",
+            "match": {
+              "location": "features/steps/registry.steps.ts:51"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 91178406
+            },
+            "arguments": [],
+            "keyword": "When ",
+            "line": 16,
+            "name": "the policy 'forall x in S. NotRevoked(x)' is registered",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:181"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 21602226
+            },
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 17,
+            "name": "the contract classifies the presented part as \"state-independent\" and the public part as \"co-stable\"",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:185"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 21134163
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 18,
+            "name": "the front end computes the same classes",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:192"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 75293267
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 19,
+            "name": "the policy is supported for issuance updates",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:198"
+            }
+          }
+        ],
+        "tags": [],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "the-contract-classifies-policies-and-rejects-unsupported-update-guards;atmost-1-x-in-s.-revoked(x)",
+        "keyword": "Scenario Outline",
+        "line": 26,
+        "name": "atmost 1 x in S. Revoked(x)",
+        "steps": [
+          {
+            "result": {
+              "status": "passed",
+              "duration": 14211947
+            },
+            "keyword": "Before",
+            "hidden": true
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 79516556
+            },
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 8,
+            "name": "a landlord with a BBS key published in its DID document",
+            "match": {
+              "location": "features/steps/registry.steps.ts:13"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 88368404
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 9,
+            "name": "a schema \"Interest\" version \"1.0\" with attributes \"flat\" and \"name\"",
+            "match": {
+              "location": "features/steps/registry.steps.ts:17"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 87266478
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 10,
+            "name": "the landlord registers a CredDef for the schema \"Interest\"",
+            "match": {
+              "location": "features/steps/registry.steps.ts:23"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 323280979
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 11,
+            "name": "a revocation registry for the CredDef with a published SRS",
+            "match": {
+              "location": "features/steps/registry.steps.ts:33"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 662388596
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 12,
+            "name": "the landlord has issued interest credentials to Alice, Bob and Carol",
+            "match": {
+              "location": "features/steps/registry.steps.ts:37"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 104855697
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 13,
+            "name": "the group S = {Alice, Bob, Carol} is anchored on chain",
+            "match": {
+              "location": "features/steps/registry.steps.ts:51"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 94249307
+            },
+            "arguments": [],
+            "keyword": "When ",
+            "line": 16,
+            "name": "the policy 'atmost 1 x in S. Revoked(x)' is registered",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:181"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 21752646
+            },
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 17,
+            "name": "the contract classifies the presented part as \"state-independent\" and the public part as \"co-stable\"",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:185"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 21807961
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 18,
+            "name": "the front end computes the same classes",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:192"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 79633866
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 19,
+            "name": "the policy is supported for issuance updates",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:198"
+            }
+          }
+        ],
+        "tags": [],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "the-contract-classifies-policies-and-rejects-unsupported-update-guards;forall-x-in-issued.-notrevoked(x)",
+        "keyword": "Scenario Outline",
+        "line": 27,
+        "name": "forall x in Issued. NotRevoked(x)",
+        "steps": [
+          {
+            "result": {
+              "status": "passed",
+              "duration": 14814331
+            },
+            "keyword": "Before",
+            "hidden": true
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 80140792
+            },
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 8,
+            "name": "a landlord with a BBS key published in its DID document",
+            "match": {
+              "location": "features/steps/registry.steps.ts:13"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 89054432
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 9,
+            "name": "a schema \"Interest\" version \"1.0\" with attributes \"flat\" and \"name\"",
+            "match": {
+              "location": "features/steps/registry.steps.ts:17"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 91348403
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 10,
+            "name": "the landlord registers a CredDef for the schema \"Interest\"",
+            "match": {
+              "location": "features/steps/registry.steps.ts:23"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 334946584
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 11,
+            "name": "a revocation registry for the CredDef with a published SRS",
+            "match": {
+              "location": "features/steps/registry.steps.ts:33"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 730163988
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 12,
+            "name": "the landlord has issued interest credentials to Alice, Bob and Carol",
+            "match": {
+              "location": "features/steps/registry.steps.ts:37"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 107107989
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 13,
+            "name": "the group S = {Alice, Bob, Carol} is anchored on chain",
+            "match": {
+              "location": "features/steps/registry.steps.ts:51"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 89437067
+            },
+            "arguments": [],
+            "keyword": "When ",
+            "line": 16,
+            "name": "the policy 'forall x in Issued. NotRevoked(x)' is registered",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:181"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 21262813
+            },
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 17,
+            "name": "the contract classifies the presented part as \"state-independent\" and the public part as \"co-stable\"",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:185"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 21072738
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 18,
+            "name": "the front end computes the same classes",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:192"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 76626275
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 19,
+            "name": "the policy is supported for issuance updates",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:198"
+            }
+          }
+        ],
+        "tags": [],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "the-contract-classifies-policies-and-rejects-unsupported-update-guards;exists-x-in-issued.-notrevoked(x)",
+        "keyword": "Scenario Outline",
+        "line": 28,
+        "name": "exists x in Issued. NotRevoked(x)",
+        "steps": [
+          {
+            "result": {
+              "status": "passed",
+              "duration": 14375803
+            },
+            "keyword": "Before",
+            "hidden": true
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 81671968
+            },
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 8,
+            "name": "a landlord with a BBS key published in its DID document",
+            "match": {
+              "location": "features/steps/registry.steps.ts:13"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 88706003
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 9,
+            "name": "a schema \"Interest\" version \"1.0\" with attributes \"flat\" and \"name\"",
+            "match": {
+              "location": "features/steps/registry.steps.ts:17"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 89714745
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 10,
+            "name": "the landlord registers a CredDef for the schema \"Interest\"",
+            "match": {
+              "location": "features/steps/registry.steps.ts:23"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 328600253
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 11,
+            "name": "a revocation registry for the CredDef with a published SRS",
+            "match": {
+              "location": "features/steps/registry.steps.ts:33"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 636014225
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 12,
+            "name": "the landlord has issued interest credentials to Alice, Bob and Carol",
+            "match": {
+              "location": "features/steps/registry.steps.ts:37"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 98070506
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 13,
+            "name": "the group S = {Alice, Bob, Carol} is anchored on chain",
+            "match": {
+              "location": "features/steps/registry.steps.ts:51"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 89934556
+            },
+            "arguments": [],
+            "keyword": "When ",
+            "line": 16,
+            "name": "the policy 'exists x in Issued. NotRevoked(x)' is registered",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:181"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 21563033
+            },
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 17,
+            "name": "the contract classifies the presented part as \"state-independent\" and the public part as \"volatile\"",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:185"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 21498653
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 18,
+            "name": "the front end computes the same classes",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:192"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 76815586
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 19,
+            "name": "the policy is supported for issuance updates",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:198"
+            }
+          }
+        ],
+        "tags": [],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "the-contract-classifies-policies-and-rejects-unsupported-update-guards;exists-x-in-presented.-sig(x,-\"interest\")-&-revoked(x)",
+        "keyword": "Scenario Outline",
+        "line": 29,
+        "name": "exists x in Presented. Sig(x, \"Interest\") & Revoked(x)",
+        "steps": [
+          {
+            "result": {
+              "status": "passed",
+              "duration": 13880749
+            },
+            "keyword": "Before",
+            "hidden": true
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 78922567
+            },
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 8,
+            "name": "a landlord with a BBS key published in its DID document",
+            "match": {
+              "location": "features/steps/registry.steps.ts:13"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 88821228
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 9,
+            "name": "a schema \"Interest\" version \"1.0\" with attributes \"flat\" and \"name\"",
+            "match": {
+              "location": "features/steps/registry.steps.ts:17"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 87711327
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 10,
+            "name": "the landlord registers a CredDef for the schema \"Interest\"",
+            "match": {
+              "location": "features/steps/registry.steps.ts:23"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 308760145
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 11,
+            "name": "a revocation registry for the CredDef with a published SRS",
+            "match": {
+              "location": "features/steps/registry.steps.ts:33"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 832914396
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 12,
+            "name": "the landlord has issued interest credentials to Alice, Bob and Carol",
+            "match": {
+              "location": "features/steps/registry.steps.ts:37"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 112750597
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 13,
+            "name": "the group S = {Alice, Bob, Carol} is anchored on chain",
+            "match": {
+              "location": "features/steps/registry.steps.ts:51"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 147211197
+            },
+            "arguments": [],
+            "keyword": "When ",
+            "line": 16,
+            "name": "the policy 'exists x in Presented. Sig(x, \"Interest\") & Revoked(x)' is registered",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:181"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 23626954
+            },
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 17,
+            "name": "the contract classifies the presented part as \"stable\" and the public part as \"state-independent\"",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:185"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 22917611
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 18,
+            "name": "the front end computes the same classes",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:192"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 29502427
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 19,
+            "name": "the policy is rejected for issuance updates",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:198"
+            }
+          }
+        ],
+        "tags": [],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "the-contract-classifies-policies-and-rejects-unsupported-update-guards;exists-x-in-presented.-sig(x,-\"interest\")-&-active(x)",
+        "keyword": "Scenario Outline",
+        "line": 30,
+        "name": "exists x in Presented. Sig(x, \"Interest\") & Active(x)",
+        "steps": [
+          {
+            "result": {
+              "status": "passed",
+              "duration": 18008381
+            },
+            "keyword": "Before",
+            "hidden": true
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 117920512
+            },
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 8,
+            "name": "a landlord with a BBS key published in its DID document",
+            "match": {
+              "location": "features/steps/registry.steps.ts:13"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 105237229
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 9,
+            "name": "a schema \"Interest\" version \"1.0\" with attributes \"flat\" and \"name\"",
+            "match": {
+              "location": "features/steps/registry.steps.ts:17"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 137955756
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 10,
+            "name": "the landlord registers a CredDef for the schema \"Interest\"",
+            "match": {
+              "location": "features/steps/registry.steps.ts:23"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 481301083
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 11,
+            "name": "a revocation registry for the CredDef with a published SRS",
+            "match": {
+              "location": "features/steps/registry.steps.ts:33"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 869888344
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 12,
+            "name": "the landlord has issued interest credentials to Alice, Bob and Carol",
+            "match": {
+              "location": "features/steps/registry.steps.ts:37"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 107313181
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 13,
+            "name": "the group S = {Alice, Bob, Carol} is anchored on chain",
+            "match": {
+              "location": "features/steps/registry.steps.ts:51"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 100356882
+            },
+            "arguments": [],
+            "keyword": "When ",
+            "line": 16,
+            "name": "the policy 'exists x in Presented. Sig(x, \"Interest\") & Active(x)' is registered",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:181"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 24233908
+            },
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 17,
+            "name": "the contract classifies the presented part as \"co-stable\" and the public part as \"state-independent\"",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:185"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 26556661
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 18,
+            "name": "the front end computes the same classes",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:192"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 38111160
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 19,
+            "name": "the policy is rejected for issuance updates",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:198"
+            }
+          }
+        ],
+        "tags": [],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "the-contract-classifies-policies-and-rejects-unsupported-update-guards;(exists-x-in-presented.-sig(x,-\"interest\")-&-notrevoked(x))-&-atmost-1-y-in-issued.-notrevoked(y)",
+        "keyword": "Scenario Outline",
+        "line": 31,
+        "name": "(exists x in Presented. Sig(x, \"Interest\") & NotRevoked(x)) & atmost 1 y in Issued. NotRevoked(y)",
+        "steps": [
+          {
+            "result": {
+              "status": "passed",
+              "duration": 22007493
+            },
+            "keyword": "Before",
+            "hidden": true
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 110680443
+            },
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 8,
+            "name": "a landlord with a BBS key published in its DID document",
+            "match": {
+              "location": "features/steps/registry.steps.ts:13"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 146225157
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 9,
+            "name": "a schema \"Interest\" version \"1.0\" with attributes \"flat\" and \"name\"",
+            "match": {
+              "location": "features/steps/registry.steps.ts:17"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 249553312
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 10,
+            "name": "the landlord registers a CredDef for the schema \"Interest\"",
+            "match": {
+              "location": "features/steps/registry.steps.ts:23"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 559339210
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 11,
+            "name": "a revocation registry for the CredDef with a published SRS",
+            "match": {
+              "location": "features/steps/registry.steps.ts:33"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 1088390328
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 12,
+            "name": "the landlord has issued interest credentials to Alice, Bob and Carol",
+            "match": {
+              "location": "features/steps/registry.steps.ts:37"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 138278088
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 13,
+            "name": "the group S = {Alice, Bob, Carol} is anchored on chain",
+            "match": {
+              "location": "features/steps/registry.steps.ts:51"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 132879235
+            },
+            "arguments": [],
+            "keyword": "When ",
+            "line": 16,
+            "name": "the policy '(exists x in Presented. Sig(x, \"Interest\") & NotRevoked(x)) & atmost 1 y in Issued. NotRevoked(y)' is registered",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:181"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 25779391
+            },
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 17,
+            "name": "the contract classifies the presented part as \"co-stable\" and the public part as \"volatile\"",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:185"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 23587251
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 18,
+            "name": "the front end computes the same classes",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:192"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 30559499
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 19,
+            "name": "the policy is rejected for issuance updates",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:198"
+            }
+          }
+        ],
+        "tags": [],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "the-contract-classifies-policies-and-rejects-unsupported-update-guards;a-query-that-does-not-split-as-presented-∧-public-stays-off-chain",
+        "keyword": "Scenario Outline",
+        "line": 39,
+        "name": "A query that does not split as presented ∧ public stays off-chain",
+        "steps": [
+          {
+            "result": {
+              "status": "passed",
+              "duration": 20101066
+            },
+            "keyword": "Before",
+            "hidden": true
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 100063234
+            },
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 8,
+            "name": "a landlord with a BBS key published in its DID document",
+            "match": {
+              "location": "features/steps/registry.steps.ts:13"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 132681246
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 9,
+            "name": "a schema \"Interest\" version \"1.0\" with attributes \"flat\" and \"name\"",
+            "match": {
+              "location": "features/steps/registry.steps.ts:17"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 121536800
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 10,
+            "name": "the landlord registers a CredDef for the schema \"Interest\"",
+            "match": {
+              "location": "features/steps/registry.steps.ts:23"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 494470556
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 11,
+            "name": "a revocation registry for the CredDef with a published SRS",
+            "match": {
+              "location": "features/steps/registry.steps.ts:33"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 912498309
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 12,
+            "name": "the landlord has issued interest credentials to Alice, Bob and Carol",
+            "match": {
+              "location": "features/steps/registry.steps.ts:37"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 112316446
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 13,
+            "name": "the group S = {Alice, Bob, Carol} is anchored on chain",
+            "match": {
+              "location": "features/steps/registry.steps.ts:51"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 465468
+            },
+            "arguments": [],
+            "keyword": "When ",
+            "line": 34,
+            "name": "the policy 'exists x in S. Sig(x, \"Landlord\") & Revoked(x)' is compiled for the chain",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:209"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 244095
+            },
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 35,
+            "name": "it cannot be bound to an on-chain action",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:218"
+            }
+          }
+        ],
+        "tags": [],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "the-contract-classifies-policies-and-rejects-unsupported-update-guards;a-query-that-does-not-split-as-presented-∧-public-stays-off-chain",
+        "keyword": "Scenario Outline",
+        "line": 40,
+        "name": "A query that does not split as presented ∧ public stays off-chain",
+        "steps": [
+          {
+            "result": {
+              "status": "passed",
+              "duration": 18340251
+            },
+            "keyword": "Before",
+            "hidden": true
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 97927459
+            },
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 8,
+            "name": "a landlord with a BBS key published in its DID document",
+            "match": {
+              "location": "features/steps/registry.steps.ts:13"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 113083629
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 9,
+            "name": "a schema \"Interest\" version \"1.0\" with attributes \"flat\" and \"name\"",
+            "match": {
+              "location": "features/steps/registry.steps.ts:17"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 106068768
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 10,
+            "name": "the landlord registers a CredDef for the schema \"Interest\"",
+            "match": {
+              "location": "features/steps/registry.steps.ts:23"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 614444720
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 11,
+            "name": "a revocation registry for the CredDef with a published SRS",
+            "match": {
+              "location": "features/steps/registry.steps.ts:33"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 1419716208
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 12,
+            "name": "the landlord has issued interest credentials to Alice, Bob and Carol",
+            "match": {
+              "location": "features/steps/registry.steps.ts:37"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 153934360
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 13,
+            "name": "the group S = {Alice, Bob, Carol} is anchored on chain",
+            "match": {
+              "location": "features/steps/registry.steps.ts:51"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 506245
+            },
+            "arguments": [],
+            "keyword": "When ",
+            "line": 34,
+            "name": "the policy '(exists x in Presented. Sig(x, \"Interest\") & Revoked(x)) or forall y in S. NotRevoked(y)' is compiled for the chain",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:209"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 111568
+            },
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 35,
+            "name": "it cannot be bound to an on-chain action",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:218"
+            }
+          }
+        ],
+        "tags": [],
+        "type": "scenario"
+      }
+    ],
+    "id": "the-contract-classifies-policies-and-rejects-unsupported-update-guards",
+    "line": 1,
+    "keyword": "Feature",
+    "name": "The contract classifies policies and rejects unsupported update guards",
+    "tags": [],
+    "uri": "features/classification.feature"
+  },
+  {
+    "description": "  The landlord books the flat by revoking the winner's interest credential,\n  but only while no member of the interested group S has been revoked.\n  The contract evaluates that guard itself when the revocation executes.",
+    "elements": [
+      {
+        "description": "",
+        "id": "flat-reservation-with-atomic-guarded-revocation;without-a-bound-policy-the-flat-is-booked-twice",
+        "keyword": "Scenario",
+        "line": 15,
+        "name": "Without a bound policy the flat is booked twice",
+        "steps": [
+          {
+            "result": {
+              "status": "passed",
+              "duration": 49386818
+            },
+            "keyword": "Before",
+            "hidden": true
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 119461878
+            },
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 7,
+            "name": "a landlord with a BBS key published in its DID document",
+            "match": {
+              "location": "features/steps/registry.steps.ts:13"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 151781743
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 8,
+            "name": "a schema \"Interest\" version \"1.0\" with attributes \"flat\" and \"name\"",
+            "match": {
+              "location": "features/steps/registry.steps.ts:17"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 157272038
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 9,
+            "name": "the landlord registers a CredDef for the schema \"Interest\"",
+            "match": {
+              "location": "features/steps/registry.steps.ts:23"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 570909520
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 10,
+            "name": "a revocation registry for the CredDef with a published SRS",
+            "match": {
+              "location": "features/steps/registry.steps.ts:33"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 1275780664
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 11,
+            "name": "the landlord has issued interest credentials to Alice, Bob and Carol",
+            "match": {
+              "location": "features/steps/registry.steps.ts:37"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 140617824
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 12,
+            "name": "the group S = {Alice, Bob, Carol} is anchored on chain",
+            "match": {
+              "location": "features/steps/registry.steps.ts:51"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 129649138
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 13,
+            "name": "the guard policy \"forall x in S. NotRevoked(x)\" is registered",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:45"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 14360034
+            },
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 16,
+            "name": "the guard policy is not bound to Revoke",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:49"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 634684625
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 17,
+            "name": "Alice and Bob both prove the guard against group version 0",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:60"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 312170608
+            },
+            "arguments": [],
+            "keyword": "When ",
+            "line": 18,
+            "name": "the landlord revokes Alice's credential",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:67"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 308398699
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 19,
+            "name": "the landlord revokes Bob's credential",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:67"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 207777
+            },
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 20,
+            "name": "both revocations are accepted",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:85"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 12209241
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 21,
+            "name": "the version of S is 2",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:96"
+            }
+          }
+        ],
+        "tags": [],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "flat-reservation-with-atomic-guarded-revocation;with-a-bound-policy-the-contract-rejects-the-second-booking",
+        "keyword": "Scenario",
+        "line": 23,
+        "name": "With a bound policy the contract rejects the second booking",
+        "steps": [
+          {
+            "result": {
+              "status": "passed",
+              "duration": 18868736
+            },
+            "keyword": "Before",
+            "hidden": true
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 111189063
+            },
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 7,
+            "name": "a landlord with a BBS key published in its DID document",
+            "match": {
+              "location": "features/steps/registry.steps.ts:13"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 120681424
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 8,
+            "name": "a schema \"Interest\" version \"1.0\" with attributes \"flat\" and \"name\"",
+            "match": {
+              "location": "features/steps/registry.steps.ts:17"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 108055115
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 9,
+            "name": "the landlord registers a CredDef for the schema \"Interest\"",
+            "match": {
+              "location": "features/steps/registry.steps.ts:23"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 417037466
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 10,
+            "name": "a revocation registry for the CredDef with a published SRS",
+            "match": {
+              "location": "features/steps/registry.steps.ts:33"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 1432919234
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 11,
+            "name": "the landlord has issued interest credentials to Alice, Bob and Carol",
+            "match": {
+              "location": "features/steps/registry.steps.ts:37"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 128736744
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 12,
+            "name": "the group S = {Alice, Bob, Carol} is anchored on chain",
+            "match": {
+              "location": "features/steps/registry.steps.ts:51"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 133281616
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 13,
+            "name": "the guard policy \"forall x in S. NotRevoked(x)\" is registered",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:45"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 125077066
+            },
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 24,
+            "name": "the guard policy is bound to Revoke for the CredDef",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:53"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 373230697
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 25,
+            "name": "Alice and Bob both prove the guard against group version 0",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:60"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 487262234
+            },
+            "arguments": [],
+            "keyword": "When ",
+            "line": 26,
+            "name": "the landlord revokes Alice's credential with her guard",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:71"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 192318
+            },
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 27,
+            "name": "the revocation is accepted",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:91"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 13256083
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 28,
+            "name": "the version of S is 1",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:96"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 176341859
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 29,
+            "name": "anyone can verify Alice's guard proof from the ledger",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:100"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 448755617
+            },
+            "arguments": [],
+            "keyword": "When ",
+            "line": 30,
+            "name": "the landlord revokes Bob's credential with his guard",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:71"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 219028
+            },
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 31,
+            "name": "the revocation is rejected with \"GuardFalse\"",
+            "match": {
+              "location": "features/steps/registry.steps.ts:71"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 103289203
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 32,
+            "name": "Bob's credential is not revoked",
+            "match": {
+              "location": "features/steps/registry.steps.ts:77"
+            }
+          }
+        ],
+        "tags": [],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "flat-reservation-with-atomic-guarded-revocation;a-stale-guard-proof-is-valid-but-not-fresh",
+        "keyword": "Scenario",
+        "line": 34,
+        "name": "A stale guard proof is valid but not fresh",
+        "steps": [
+          {
+            "result": {
+              "status": "passed",
+              "duration": 20267377
+            },
+            "keyword": "Before",
+            "hidden": true
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 103424746
+            },
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 7,
+            "name": "a landlord with a BBS key published in its DID document",
+            "match": {
+              "location": "features/steps/registry.steps.ts:13"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 139902078
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 8,
+            "name": "a schema \"Interest\" version \"1.0\" with attributes \"flat\" and \"name\"",
+            "match": {
+              "location": "features/steps/registry.steps.ts:17"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 108939737
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 9,
+            "name": "the landlord registers a CredDef for the schema \"Interest\"",
+            "match": {
+              "location": "features/steps/registry.steps.ts:23"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 502881118
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 10,
+            "name": "a revocation registry for the CredDef with a published SRS",
+            "match": {
+              "location": "features/steps/registry.steps.ts:33"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 1052580752
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 11,
+            "name": "the landlord has issued interest credentials to Alice, Bob and Carol",
+            "match": {
+              "location": "features/steps/registry.steps.ts:37"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 154342672
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 12,
+            "name": "the group S = {Alice, Bob, Carol} is anchored on chain",
+            "match": {
+              "location": "features/steps/registry.steps.ts:51"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 123906601
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 13,
+            "name": "the guard policy \"forall x in S. NotRevoked(x)\" is registered",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:45"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 1587336114
+            },
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 35,
+            "name": "Alice's guarded revocation has been accepted",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:75"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 88421483
+            },
+            "arguments": [],
+            "keyword": "When ",
+            "line": 36,
+            "name": "a verifier checks Bob's guard proof",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:131"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 114864
+            },
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 37,
+            "name": "the proof is cryptographically valid",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:135"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 123350
+            },
+            "arguments": [],
+            "keyword": "But ",
+            "line": 38,
+            "name": "it is not fresh because S moved from version 0 to 1",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:139"
+            }
+          }
+        ],
+        "tags": [],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "flat-reservation-with-atomic-guarded-revocation;a-bound-policy-cannot-be-bypassed",
+        "keyword": "Scenario",
+        "line": 40,
+        "name": "A bound policy cannot be bypassed",
+        "steps": [
+          {
+            "result": {
+              "status": "passed",
+              "duration": 23619631
+            },
+            "keyword": "Before",
+            "hidden": true
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 134015915
+            },
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 7,
+            "name": "a landlord with a BBS key published in its DID document",
+            "match": {
+              "location": "features/steps/registry.steps.ts:13"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 119784852
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 8,
+            "name": "a schema \"Interest\" version \"1.0\" with attributes \"flat\" and \"name\"",
+            "match": {
+              "location": "features/steps/registry.steps.ts:17"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 135006374
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 9,
+            "name": "the landlord registers a CredDef for the schema \"Interest\"",
+            "match": {
+              "location": "features/steps/registry.steps.ts:23"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 618664896
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 10,
+            "name": "a revocation registry for the CredDef with a published SRS",
+            "match": {
+              "location": "features/steps/registry.steps.ts:33"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 984687724
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 11,
+            "name": "the landlord has issued interest credentials to Alice, Bob and Carol",
+            "match": {
+              "location": "features/steps/registry.steps.ts:37"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 112292091
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 12,
+            "name": "the group S = {Alice, Bob, Carol} is anchored on chain",
+            "match": {
+              "location": "features/steps/registry.steps.ts:51"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 106612365
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 13,
+            "name": "the guard policy \"forall x in S. NotRevoked(x)\" is registered",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:45"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 110996936
+            },
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 41,
+            "name": "the guard policy is bound to Revoke for the CredDef",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:53"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 125488754
+            },
+            "arguments": [],
+            "keyword": "When ",
+            "line": 42,
+            "name": "the landlord revokes Carol's credential without a guard",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:67"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 75110
+            },
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 43,
+            "name": "the revocation is rejected with \"PolicyRequired\"",
+            "match": {
+              "location": "features/steps/registry.steps.ts:71"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 85860073
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 44,
+            "name": "Carol's credential is not revoked",
+            "match": {
+              "location": "features/steps/registry.steps.ts:77"
+            }
+          }
+        ],
+        "tags": [],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "flat-reservation-with-atomic-guarded-revocation;the-issuer-cannot-reserve-the-flat-twice",
+        "keyword": "Scenario",
+        "line": 46,
+        "name": "The issuer cannot reserve the flat twice",
+        "steps": [
+          {
+            "result": {
+              "status": "passed",
+              "duration": 17657456
+            },
+            "keyword": "Before",
+            "hidden": true
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 108314710
+            },
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 7,
+            "name": "a landlord with a BBS key published in its DID document",
+            "match": {
+              "location": "features/steps/registry.steps.ts:13"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 110398499
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 8,
+            "name": "a schema \"Interest\" version \"1.0\" with attributes \"flat\" and \"name\"",
+            "match": {
+              "location": "features/steps/registry.steps.ts:17"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 106247843
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 9,
+            "name": "the landlord registers a CredDef for the schema \"Interest\"",
+            "match": {
+              "location": "features/steps/registry.steps.ts:23"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 628627094
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 10,
+            "name": "a revocation registry for the CredDef with a published SRS",
+            "match": {
+              "location": "features/steps/registry.steps.ts:33"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 1418962492
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 11,
+            "name": "the landlord has issued interest credentials to Alice, Bob and Carol",
+            "match": {
+              "location": "features/steps/registry.steps.ts:37"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 186498411
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 12,
+            "name": "the group S = {Alice, Bob, Carol} is anchored on chain",
+            "match": {
+              "location": "features/steps/registry.steps.ts:51"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 133177481
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 13,
+            "name": "the guard policy \"forall x in S. NotRevoked(x)\" is registered",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:45"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 1685202270
+            },
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 47,
+            "name": "Alice's guarded revocation has been accepted",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:75"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 173752559
+            },
+            "arguments": [],
+            "keyword": "When ",
+            "line": 48,
+            "name": "the landlord revokes Bob's credential without a guard",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:67"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 96701
+            },
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 49,
+            "name": "the revocation is rejected with \"PolicyRequired\"",
+            "match": {
+              "location": "features/steps/registry.steps.ts:71"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 590187039
+            },
+            "arguments": [],
+            "keyword": "When ",
+            "line": 50,
+            "name": "the landlord revokes Bob's credential under the policy \"exists x in S. Revoked(x)\"",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:110"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 90749
+            },
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 51,
+            "name": "the revocation is rejected with \"WrongPolicy\"",
+            "match": {
+              "location": "features/steps/registry.steps.ts:71"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 159033495
+            },
+            "arguments": [],
+            "keyword": "When ",
+            "line": 52,
+            "name": "the landlord revokes Bob's credential with a made-up guard proof",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:116"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 83887
+            },
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 53,
+            "name": "the revocation is rejected with \"GuardFalse\"",
+            "match": {
+              "location": "features/steps/registry.steps.ts:71"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 113358782
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 54,
+            "name": "Bob's credential is not revoked",
+            "match": {
+              "location": "features/steps/registry.steps.ts:77"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 14199324
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 55,
+            "name": "the version of S is 1",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:96"
+            }
+          }
+        ],
+        "tags": [],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "flat-reservation-with-atomic-guarded-revocation;the-loser's-proof-stays-valid-after-later-updates",
+        "keyword": "Scenario",
+        "line": 57,
+        "name": "The loser's proof stays valid after later updates",
+        "steps": [
+          {
+            "result": {
+              "status": "passed",
+              "duration": 22747123
+            },
+            "keyword": "Before",
+            "hidden": true
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 99236813
+            },
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 7,
+            "name": "a landlord with a BBS key published in its DID document",
+            "match": {
+              "location": "features/steps/registry.steps.ts:13"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 148557098
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 8,
+            "name": "a schema \"Interest\" version \"1.0\" with attributes \"flat\" and \"name\"",
+            "match": {
+              "location": "features/steps/registry.steps.ts:17"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 168748141
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 9,
+            "name": "the landlord registers a CredDef for the schema \"Interest\"",
+            "match": {
+              "location": "features/steps/registry.steps.ts:23"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 485825294
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 10,
+            "name": "a revocation registry for the CredDef with a published SRS",
+            "match": {
+              "location": "features/steps/registry.steps.ts:33"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 1146997321
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 11,
+            "name": "the landlord has issued interest credentials to Alice, Bob and Carol",
+            "match": {
+              "location": "features/steps/registry.steps.ts:37"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 117961620
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 12,
+            "name": "the group S = {Alice, Bob, Carol} is anchored on chain",
+            "match": {
+              "location": "features/steps/registry.steps.ts:51"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 134955949
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 13,
+            "name": "the guard policy \"forall x in S. NotRevoked(x)\" is registered",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:45"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 1212385827
+            },
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 58,
+            "name": "Alice's guarded revocation has been accepted",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:75"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 192017578
+            },
+            "arguments": [],
+            "keyword": "When ",
+            "line": 59,
+            "name": "Bob proves \"exists x in S. Revoked(x)\"",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:145"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 175938
+            },
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 60,
+            "name": "the proof is valid and its class is \"stable\"",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:152"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 553816076
+            },
+            "arguments": [],
+            "keyword": "When ",
+            "line": 61,
+            "name": "the landlord issues a new credential to Dave",
+            "match": {
+              "location": "features/steps/registry.steps.ts:45"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 101540550
+            },
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 62,
+            "name": "Bob's proof is still valid and fresh",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:157"
+            }
+          }
+        ],
+        "tags": [],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "flat-reservation-with-atomic-guarded-revocation;alice-proves-the-reservation-without-revealing-who-she-is",
+        "keyword": "Scenario",
+        "line": 64,
+        "name": "Alice proves the reservation without revealing who she is",
+        "steps": [
+          {
+            "result": {
+              "status": "passed",
+              "duration": 17327741
+            },
+            "keyword": "Before",
+            "hidden": true
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 118408624
+            },
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 7,
+            "name": "a landlord with a BBS key published in its DID document",
+            "match": {
+              "location": "features/steps/registry.steps.ts:13"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 163307309
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 8,
+            "name": "a schema \"Interest\" version \"1.0\" with attributes \"flat\" and \"name\"",
+            "match": {
+              "location": "features/steps/registry.steps.ts:17"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 186603175
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 9,
+            "name": "the landlord registers a CredDef for the schema \"Interest\"",
+            "match": {
+              "location": "features/steps/registry.steps.ts:23"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 498338632
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 10,
+            "name": "a revocation registry for the CredDef with a published SRS",
+            "match": {
+              "location": "features/steps/registry.steps.ts:33"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 997685036
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 11,
+            "name": "the landlord has issued interest credentials to Alice, Bob and Carol",
+            "match": {
+              "location": "features/steps/registry.steps.ts:37"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 160116726
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 12,
+            "name": "the group S = {Alice, Bob, Carol} is anchored on chain",
+            "match": {
+              "location": "features/steps/registry.steps.ts:51"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 144604723
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 13,
+            "name": "the guard policy \"forall x in S. NotRevoked(x)\" is registered",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:45"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 1861811218
+            },
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 65,
+            "name": "Alice's guarded revocation has been accepted",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:75"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 979303898
+            },
+            "arguments": [],
+            "keyword": "When ",
+            "line": 66,
+            "name": "Alice proves 'exists x in S. Sig(x, \"Landlord\") & Revoked(x)'",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:145"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 151643
+            },
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 67,
+            "name": "the verifier accepts the proof",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:165"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 244877
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 68,
+            "name": "the proof does not reveal which member of S she is",
+            "match": {
+              "location": "features/steps/reservation.steps.ts:169"
+            }
+          }
+        ],
+        "tags": [],
+        "type": "scenario"
+      }
+    ],
+    "id": "flat-reservation-with-atomic-guarded-revocation",
+    "line": 1,
+    "keyword": "Feature",
+    "name": "Flat reservation with atomic guarded revocation",
+    "tags": [],
+    "uri": "features/flat-reservation.feature"
+  },
+  {
+    "description": "  The registry contract checks every write against the current state,\n  so a wrong value never reaches the ledger.",
+    "elements": [
+      {
+        "description": "",
+        "id": "verify-on-write;a-creddef-needs-an-existing-schema",
+        "keyword": "Scenario",
+        "line": 8,
+        "name": "A CredDef needs an existing schema",
+        "steps": [
+          {
+            "result": {
+              "status": "passed",
+              "duration": 20081789
+            },
+            "keyword": "Before",
+            "hidden": true
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 97267017
+            },
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 6,
+            "name": "a landlord with a BBS key published in its DID document",
+            "match": {
+              "location": "features/steps/registry.steps.ts:13"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 15705142
+            },
+            "arguments": [],
+            "keyword": "When ",
+            "line": 9,
+            "name": "the landlord registers a CredDef for an unknown schema",
+            "match": {
+              "location": "features/steps/registry.steps.ts:29"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 76042
+            },
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 10,
+            "name": "the registration is rejected with \"UnknownSchema\"",
+            "match": {
+              "location": "features/steps/registry.steps.ts:71"
+            }
+          }
+        ],
+        "tags": [],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "verify-on-write;the-chain-rejects-a-wrong-revocation-step",
+        "keyword": "Scenario",
+        "line": 12,
+        "name": "The chain rejects a wrong revocation step",
+        "steps": [
+          {
+            "result": {
+              "status": "passed",
+              "duration": 26851700
+            },
+            "keyword": "Before",
+            "hidden": true
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 195309110
+            },
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 6,
+            "name": "a landlord with a BBS key published in its DID document",
+            "match": {
+              "location": "features/steps/registry.steps.ts:13"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 133353940
+            },
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 13,
+            "name": "a schema \"Interest\" version \"1.0\" with attributes \"flat\" and \"name\"",
+            "match": {
+              "location": "features/steps/registry.steps.ts:17"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 161904842
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 14,
+            "name": "the landlord registers a CredDef for the schema \"Interest\"",
+            "match": {
+              "location": "features/steps/registry.steps.ts:23"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 586746940
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 15,
+            "name": "a revocation registry for the CredDef with a published SRS",
+            "match": {
+              "location": "features/steps/registry.steps.ts:33"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 771941728
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 16,
+            "name": "the landlord has issued interest credentials to Alice and Bob",
+            "match": {
+              "location": "features/steps/registry.steps.ts:37"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 147898829
+            },
+            "arguments": [],
+            "keyword": "When ",
+            "line": 17,
+            "name": "the landlord submits a revocation of Alice with a wrong new A",
+            "match": {
+              "location": "features/steps/registry.steps.ts:63"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 368598
+            },
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 18,
+            "name": "the revocation is rejected with \"StepCheckFailed\"",
+            "match": {
+              "location": "features/steps/registry.steps.ts:71"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 96600913
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 19,
+            "name": "Alice's credential is not revoked",
+            "match": {
+              "location": "features/steps/registry.steps.ts:77"
+            }
+          }
+        ],
+        "tags": [],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "verify-on-write;a-group-holds-issued-credentials-only",
+        "keyword": "Scenario",
+        "line": 21,
+        "name": "A group holds issued credentials only",
+        "steps": [
+          {
+            "result": {
+              "status": "passed",
+              "duration": 26699466
+            },
+            "keyword": "Before",
+            "hidden": true
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 127098579
+            },
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 6,
+            "name": "a landlord with a BBS key published in its DID document",
+            "match": {
+              "location": "features/steps/registry.steps.ts:13"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 107245015
+            },
+            "arguments": [],
+            "keyword": "Given ",
+            "line": 22,
+            "name": "a schema \"Interest\" version \"1.0\" with attributes \"flat\" and \"name\"",
+            "match": {
+              "location": "features/steps/registry.steps.ts:17"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 150853972
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 23,
+            "name": "the landlord registers a CredDef for the schema \"Interest\"",
+            "match": {
+              "location": "features/steps/registry.steps.ts:23"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 662859094
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 24,
+            "name": "a revocation registry for the CredDef with a published SRS",
+            "match": {
+              "location": "features/steps/registry.steps.ts:33"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 702951311
+            },
+            "arguments": [],
+            "keyword": "And ",
+            "line": 25,
+            "name": "the landlord has issued interest credentials to Alice and Bob",
+            "match": {
+              "location": "features/steps/registry.steps.ts:37"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 29862228
+            },
+            "arguments": [],
+            "keyword": "When ",
+            "line": 26,
+            "name": "the landlord anchors a group of Alice and an ID that was never issued",
+            "match": {
+              "location": "features/steps/registry.steps.ts:57"
+            }
+          },
+          {
+            "result": {
+              "status": "passed",
+              "duration": 88195
+            },
+            "arguments": [],
+            "keyword": "Then ",
+            "line": 27,
+            "name": "the group creation is rejected with \"MemberNotIssued\"",
+            "match": {
+              "location": "features/steps/registry.steps.ts:71"
+            }
+          }
+        ],
+        "tags": [],
+        "type": "scenario"
+      }
+    ],
+    "id": "verify-on-write",
+    "line": 1,
+    "keyword": "Feature",
+    "name": "Verify on write",
+    "tags": [],
+    "uri": "features/verify-on-write.feature"
+  }
+]

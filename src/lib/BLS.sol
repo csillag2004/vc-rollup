@@ -80,13 +80,17 @@ library BLS {
 
     function g1Msm(bytes[] memory ps, uint256[] memory ss) internal view returns (bytes memory) {
         bytes memory input;
-        for (uint256 i = 0; i < ps.length; i++) input = abi.encodePacked(input, ps[i], ss[i]);
+        for (uint256 i = 0; i < ps.length; i++) {
+            input = abi.encodePacked(input, ps[i], ss[i]);
+        }
         return _call(G1_MSM, input);
     }
 
     function g2Msm(bytes[] memory ps, uint256[] memory ss) internal view returns (bytes memory) {
         bytes memory input;
-        for (uint256 i = 0; i < ps.length; i++) input = abi.encodePacked(input, ps[i], ss[i]);
+        for (uint256 i = 0; i < ps.length; i++) {
+            input = abi.encodePacked(input, ps[i], ss[i]);
+        }
         return _call(G2_MSM, input);
     }
 
@@ -117,27 +121,26 @@ library BLS {
     }
 
     /// e(a1, b1) · e(a2, b2) == 1
-    function pairing2(bytes memory a1, bytes memory b1, bytes memory a2, bytes memory b2)
-        internal view returns (bool)
-    {
+    function pairing2(bytes memory a1, bytes memory b1, bytes memory a2, bytes memory b2) internal view returns (bool) {
         bytes memory out = _call(PAIRING, abi.encodePacked(a1, b1, a2, b2));
         return out.length == 32 && uint256(bytes32(out)) == 1;
     }
 
     /// e(a1, b1) · e(a2, b2) · e(a3, b3) == 1
     function pairing3(
-        bytes memory a1, bytes memory b1,
-        bytes memory a2, bytes memory b2,
-        bytes memory a3, bytes memory b3
+        bytes memory a1,
+        bytes memory b1,
+        bytes memory a2,
+        bytes memory b2,
+        bytes memory a3,
+        bytes memory b3
     ) internal view returns (bool) {
         bytes memory out = _call(PAIRING, abi.encodePacked(a1, b1, a2, b2, a3, b3));
         return out.length == 32 && uint256(bytes32(out)) == 1;
     }
 
     /// e(x, y) == e(z, w), azaz e(x, y) · e(-z, w) == 1
-    function pairingEq(bytes memory x, bytes memory y, bytes memory z, bytes memory w)
-        internal view returns (bool)
-    {
+    function pairingEq(bytes memory x, bytes memory y, bytes memory z, bytes memory w) internal view returns (bool) {
         return pairing2(x, y, g1Neg(z), w);
     }
 

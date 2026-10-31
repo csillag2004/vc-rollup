@@ -1,0 +1,10 @@
+
+> revoq-offchain@0.1.0 bdd
+> cucumber-js --format json:<repo>/out/publish/bdd.json --format progress
+
+........................................................................................................................
+
+2 hooks (2 passed)
+15 scenarios (15 passed)
+118 steps (118 passed)
+0m 17.373s (0m 17.348s executing your code)

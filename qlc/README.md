@@ -1,12 +1,18 @@
 # qlc
 
-`qlc` is the front end of the credential query language compiler from the design
-record behind the query-language dashboard (`DESIGN.md`, sections 3 and 4; the
-code cites its section numbers, and the record is not in this repository). It
-parses a query, rewrites it to negation normal form, classifies it as monotone,
-antitone, non-monotone or state-independent, derives the contract requirement
-for a guarded registry update, and builds a proof plan. It does not produce
-proofs.
+`qlc` is a separate Rust front end for a broader credential query language. It
+parses queries, rewrites them to negation normal form, classifies their state
+dependence and builds proof plans. It does not produce cryptographic proofs.
+The executable TypeScript subset used by the companion experiments lives in
+[`offchain/src/ql`](../offchain/src/ql); acceptance by this Rust front end does
+not imply that a query can be proved by that implementation.
+
+Historical `DESIGN.md` section references below and in source comments identify
+an earlier design record that is not distributed with the artifact. They are
+provenance notes, not required build inputs or available specifications. The
+selected implementation scope is [ARTIFACT-CONTRACT.md](../design/ARTIFACT-CONTRACT.md).
+The syntax table below documents this Rust front end, including planned atoms
+whose proof constructions are outside the executable TypeScript subset.
 
 The crate has no dependencies. It builds as a Rust library and as a
 WebAssembly module (about 115 KB) that the offline dashboard loads without
@@ -84,8 +90,8 @@ The pretty printer writes `atleast k` as `∃≥k` and `atmost k` as `∃≤k`.
 
 ## Classification is a syntactic sufficient condition
 
-DESIGN.md 3.5 defines the classes semantically, over registry states ordered
-by inclusion of the issued and revoked sets. A formula is monotone when it
+The classes are defined semantically over registry states ordered
+by inclusion of the issued and revoked sets (historical design section 3.5). A formula is monotone when it
 stays true as the state grows, and antitone when it stays false as the state
 grows. Deciding that for an arbitrary formula means reasoning about all
 states. `classify.rs` decides a sufficient condition from the syntax of the
