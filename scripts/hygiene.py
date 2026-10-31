@@ -54,18 +54,7 @@ def tree_grep(rule, rx, msg, pathspec=".", allow=None):
     out = git("grep", "-I", "-n", "-i", "-E", rx, "--", pathspec, f":!{SELF}")
     for hit in out.splitlines():
         path, line, text = hit.split(":", 2)
-        # CONTRACT.md is sealed with the Lean specification. Preserve its original
-        # historical citation without exempting any other private URL or file.
-        sealed_citation = (
-            rule == "private-link" and path == "verification/lean/CONTRACT.md"
-            and "https://github.com/BlackLight54/TDK26-Kocsis-Kamilla/blob/"
-                "e53e4837cfaf28f11ea9cf69b7e9c7b3e206d22e/content/03-proposed-approach.tex" in text
-            and not re.search(PRIVATE_LINKS, re.sub(
-                r"https://github\.com/BlackLight54/TDK26-Kocsis-Kamilla/blob/"
-                r"e53e4837cfaf28f11ea9cf69b7e9c7b3e206d22e/content/03-proposed-approach\.tex(?:#L[0-9]+-L[0-9]+)?",
-                "", text), re.I)
-        )
-        if not sealed_citation and not (allow and re.search(allow, text)):
+        if not (allow and re.search(allow, text)):
             report("error", rule, msg, path, line)
 
 
