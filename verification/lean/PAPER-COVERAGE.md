@@ -4,12 +4,7 @@ This historical mapping includes claims from a stronger contract revision. For t
 
 What the Lean model says about each lemma and design-level claim of the historical paper source `content/03-proposed-approach.tex`, revision `e53e4837cfaf28f11ea9cf69b7e9c7b3e206d22e` (private source, not included in this artifact). Theorem locations and axioms are in `THEOREMS.md`; the encoding and its assumptions are in `CONTRACT.md`.
 
-The findings for the author are in `paper-todos.json`. Its `todos` are ready-to-paste `\atodo[inline]{…}` notes, each backed by the theorems it names and placed by a LaTeX label of the chapter. Its `judgment` items are observations that no theorem backs; they need a supervisor's call before they become to-dos. To preview or insert the notes:
-
-```sh
-python3 -I scripts/apply-paper-todos.py <paper>/content/03-proposed-approach.tex          # diff only
-python3 -I scripts/apply-paper-todos.py <paper>/content/03-proposed-approach.tex --write  # insert
-```
+The findings went to the author as notes on the paper; they are not part of this artifact.
 
 The script places notes by text, so it applies on top of other review layers that keep the anchors, and skips notes already present. On e53e483 all 14 notes apply, and the paper builds with them without errors or undefined references.
 
@@ -62,7 +57,7 @@ The same contract fixes a group's members at creation and accepts only issued ID
 
 ## Findings without a theorem
 
-These are the `judgment` items of `paper-todos.json`:
+These are observations that no theorem backs:
 
 - `s4-s9`: S4 publishes revoked identifiers, S9 says only issuer and holder know them; S9 holds as unlinkability.
 - `closure-gap`: lem:closure does not cover quantifiers over formulas.

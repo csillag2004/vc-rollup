@@ -3,8 +3,7 @@
 The submission scope selected on 2026-10-31 is defined by [ARTIFACT-CONTRACT.md](ARTIFACT-CONTRACT.md). This plan records the original interview; its branch instructions, time budget, planned file layout and absence of formal modeling are historical. Current commands are in the [README](../README.md).
 
 Branch: `tdk/full-implementation`, forked from `origin/consultation-10-06` (`925a6d2 guardissuance`).
-Time budget: one day. Thesis text is not edited here; the required thesis changes are in
-[`THESIS-CHANGES.md`](THESIS-CHANGES.md).
+Time budget: one day. Thesis text is not edited here.
 
 ## Decisions (from the design interview, 2026-10-28/29)
 

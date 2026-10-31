@@ -78,7 +78,7 @@ See [validation and remaining release work](results/VALIDATION.md). Re-running a
 
 The race demonstrates prevention of a second reservation when the issuer verifies a true guard and declares the correct CAS policy. The contract does not evaluate the query or verify the guard proof. Pairing checks do not enforce all set relations against an issuer who knows the accumulator secret. Read the [trust boundary](design/ARTIFACT-CONTRACT.md) before interpreting the results.
 
-[Historical evaluation](design/EVALUATION.md) and [OP Sepolia evidence](design/OP-SEPOLIA-RUN.md) are retained with their original provenance. Local reproduction does not redeploy contracts or establish current testnet performance. [Thesis changes](design/THESIS-CHANGES.md) identify claims that need alignment with this reduced design.
+[Historical evaluation](design/EVALUATION.md) and [OP Sepolia evidence](design/OP-SEPOLIA-RUN.md) are retained with their original provenance. Local reproduction does not redeploy contracts or establish current testnet performance.
 
 ## Contributions
 
