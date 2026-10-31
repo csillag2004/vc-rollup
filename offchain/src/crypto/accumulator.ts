@@ -55,30 +55,17 @@ export function makeSrs(alpha: bigint, degree: number): Srs {
 export interface IssueStepValues {
   newI: G1Point;
   newWIR: G1Point;
-  T: G1Point;      // I^y
-  Rcommit: G1Point; // Schnorr commitment I^k
-  z: bigint;       // k + c·y
   receiptA: G1Point; // C = A^(1/(y+α))
   receiptI: G1Point; // the old I: receipt for y against newI
 }
 
 /**
- * Issuance: I' = I^(y+α), W_IR' = W_IR^(y+α), receipt C = A^(1/(y+α)) (static add: A unchanged).
- * The Schnorr proof of knowledge of y for T = I^y uses the challenge the contract computes.
+ * Issuance of a public y: I' = I^(y+α), W_IR' = W_IR^(y+α), receipt C = A^(1/(y+α)) (static add: A unchanged).
+ * The contract checks I' against I and y (step) and keeps y in storage, so each y is issued once.
  */
-export function issueStep(
-  secret: AccumulatorSecret, values: RegistryValues, y: bigint,
-  challenge: (newI: G1Point, T: G1Point, Rc: G1Point) => bigint,
-): IssueStepValues {
-  const { alpha } = secret;
-  const newI = mul(values.I, y + alpha);
-  const newWIR = mul(values.WIR, y + alpha);
-  const T = mul(values.I, y);
-  const k = randomScalar();
-  const Rcommit = mul(values.I, k);
-  const c = challenge(newI, T, Rcommit);
-  const z = mod(k + c * y);
-  return { newI, newWIR, T, Rcommit, z, receiptA: mul(values.A, inv(y + alpha)), receiptI: values.I };
+export function issueStep(secret: AccumulatorSecret, values: RegistryValues, y: bigint): IssueStepValues {
+  const f = mod(y + secret.alpha);
+  return { newI: mul(values.I, f), newWIR: mul(values.WIR, f), receiptA: mul(values.A, inv(f)), receiptI: values.I };
 }
 
 export interface RevokeStepValues {
@@ -91,11 +78,6 @@ export interface RevokeStepValues {
 export function revokeStep(secret: AccumulatorSecret, values: RegistryValues, y: bigint): RevokeStepValues {
   const f = mod(y + secret.alpha);
   return { newA: mul(values.A, inv(f)), newRtilde: mul(values.Rtilde, f), newWIR: mul(values.WIR, inv(f)) };
-}
-
-/** Group anchoring witness: W_S = I^(1/P_S(α)) = [P_Iss / P_S]_1. */
-export function groupSubsetWitness(secret: AccumulatorSecret, I: G1Point, members: bigint[]): G1Point {
-  return mul(I, inv(setPolyAt(members, secret.alpha)));
 }
 
 /** Aggregate receipt for ∀x∈S. NotRevoked(x), with α: W = A^(1/P_S(α)). */

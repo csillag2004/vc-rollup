@@ -1,21 +1,24 @@
 {
   "naiveDoubleBooking": true,
-  "casRejected": "StaleGroupVersion",
+  "guardRejected": "GuardFalse",
+  "guardProofFromLedger": true,
   "loserProofValid": true,
   "loserProofStillValidLater": true,
+  "stableProofAfterSameRegistryUpdates": true,
   "holderReservationProof": true,
   "gas": {
-    "guardedRevokeGroupCas": "696864"
+    "guardedRevokeGroup": "718008"
   },
   "log": [
     "deployed StateRegistry at 0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
     "naive: both guards hold at the same state: true / true",
     "naive: revoked members of S after the race: 2 (the flat is booked twice)",
-    "cas: Alice's guarded revocation accepted (gas 696864)",
-    "cas: Bob's guarded revocation rejected: StaleGroupVersion",
-    "cas: Bob's guard proof is cryptographically valid (true) but no longer fresh (group S moved from version 0 to 1)",
+    "separate stable fixture: proof survives actual later issuance and revocation in its registry: true",
+    "guarded: Alice's guarded revocation accepted (gas 718008)",
+    "guarded: Alice's guard proof read back from the GuardProof event of version 4: valid true",
+    "guarded: Bob's guarded revocation rejected: GuardFalse",
+    "guarded: Bob's guard proof is cryptographically valid (true) but no longer fresh (group S moved from version 0 to 1)",
     "loser's proof ∃x∈S.Revoked(x): valid true, class stable",
-    "later update: landlord binds the stable taken-flat policy and revokes a newly issued credential outside S",
     "loser's proof after later updates: valid true",
     "Alice: \"one of S, signed by the landlord, revoked\": true (class stable)"
   ]

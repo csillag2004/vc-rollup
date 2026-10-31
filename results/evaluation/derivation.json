@@ -1,16 +1,18 @@
 {
-  "measurementRevision": "622a9fe3012a5ce73d27cd97176846558fad929b",
+  "measurementRevision": "a2d0cf26823917e767e55532bd240819608fc29e",
   "smoke": false,
-  "inputProvenanceSha256": "669a51e37ce23ec9661e6a0882158dc867ee538cb5c9eddb4f5f0999809a34ad",
-  "rendererSha256": "535543d14491731c668318b9a35c2c5669573d35be19fd8a7af3652ed91640b0",
+  "inputProvenanceSha256": "1572f704e36900d84a522f69055834710e375411fcbf0d89b9fba75f301a79dc",
+  "rendererSha256": "ff0ee7238c7f48143b14d5e3600002dcde05f2a1ad86f563dc2182cff8703445",
   "matplotlib": "3.10.7",
   "outputs": {
-    "classification.png": "c3f2223aba86581924f6c535e5db94b9dd219625815c7740f2d19b5e4f47524f",
-    "classification.svg": "accf017208271d58de770a1c4bc0dbf1b28e024bac375a77ea378090ee4b954f",
-    "evaluation.md": "ac5c21ef545cf4981106d1245df4ca407da5c5a93dc676d0ea50f5c1224c51c9",
-    "group-gas.png": "6863ed41ac23c54a5e8ea2461cffa17b3f5ceba7f71f5b8bd4b286f5e703bd2c",
-    "group-gas.svg": "e11bd19ba89718339a64dcd56a8109f1b5c6d6fdf11c71ac276f58dd4235bd5e",
-    "proof-cost.png": "f3fa4e2691cdf5d6cccc1c21b36adca684f431a6a8f3c89620fa6aec5411dcbe",
-    "proof-cost.svg": "0a86e1114629e6dc78474ebfe73f341560f5f1959d369063095fea5aa47687fa"
+    "classification.png": "d8ba432f4e7aa535e563e8b072fe80dfb577b80afc217f604aecf8e4c9ec9df2",
+    "classification.svg": "36634e900c5272107b18019d9952f3857b59c344fd599d8b5ab3de9d5c0c0d73",
+    "evaluation.md": "da28eefc9320a5dddb1cf6a9b97dc8cda214e4acff0672e11eff8b90fcdd17e3",
+    "group-gas.png": "f63be592991b434dc767c778020b09bd7ffdb01a1dde720b98e063b6cddb925d",
+    "group-gas.svg": "69ebb1343410ef4e57574dd40c05942b75510506421512c8f1c917b2d41e25f4",
+    "guard-overhead.png": "42ab0a25b910e8f3e455212bf4f035933126908f555de8b9bc2965686d8ddb20",
+    "guard-overhead.svg": "ea45a150e154b9f16687eabdb0b923b1a851f6dfaf792789ef8b411285acd22f",
+    "proof-cost.png": "a765da70b85b143e8c7405f63f4f30559bedbd594cc620adb2cc65aa69c6aeae",
+    "proof-cost.svg": "9818099818f3703b08eb28c4b87a036d393daf163d634aaa16ea14f7f65197f7"
   }
 }

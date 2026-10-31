@@ -2,7 +2,7 @@
 
 Companion artifact for *Joint anonymized issuance and revocation for complex verifiable credential chains* by Kocsis Csillag Kamilla (2026).
 
-This prototype combines BBS credentials, a query language, three BLS12-381 accumulators and atomic compare-and-swap (CAS) updates on an EVM with EIP-2537. The selected artifact uses hidden issuance, trusted issuer/updater checks and proof hashes. Its executable scope and trust assumptions are in [ARTIFACT-CONTRACT.md](design/ARTIFACT-CONTRACT.md).
+This prototype combines BBS credentials, a query language, three BLS12-381 accumulators and ledger-enforced public guards on an EVM with EIP-2537. Issuance publishes IDs; storage enforces lifecycle and group membership. The contract evaluates bound public guards at execution, and update policies cannot be removed or replaced. Private update guards are rejected because the existing proof construction is unsound against the accumulator trapdoor holder. See [the executable contract](design/ENFORCED-GUARDS.md).
 
 ## Setup
 
@@ -51,14 +51,14 @@ The [written evaluation](results/evaluation/evaluation.md) states four research 
 
 ## Recorded results
 
-[Full local report](results/local/report.md), [provenance](results/local/provenance.json), and [demo recording](results/demo/demo.cast) were generated from [the recorded source revision](https://github.com/csillag2004/vc-rollup/commit/622a9fe3012a5ce73d27cd97176846558fad929b). The full run took 61.2 seconds on the host described in provenance. This was a shared development host without CPU isolation; timings are measurements of this run, not performance guarantees.
+[Current local report](results/local/report.md), [provenance](results/local/provenance.json), and [demo recording](results/demo/demo.cast) identify the evaluated source revision and machine. Earlier reduced-design measurements are retained under [historical/reduced](results/historical/reduced/VALIDATION.md); their numbers and guarantees do not describe this ABI. Timings were taken on a shared development host without CPU isolation.
 
 | Evidence | Recipe | Output |
 |---|---|---|
 | Reservation race and BDD correctness | `just evaluate` | `out/correctness.csv`, `out/bdd.json` |
 | Bounded classification, 3,000 formulas per model | `just evaluate` | `out/classification.csv` |
 | Proof scaling, groups of 4/16/64 and thresholds 1–4 | `just benchmark` | `out/scalability.csv` |
-| Gas and calldata, including all CAS modes | `just benchmark` | `out/gas.csv` |
+| Gas and calldata for public guarded updates | `just benchmark` | `out/gas.csv` |
 | Invalid inputs, stale state and guard regressions | `just robustness` | `out/robustness.csv`, `out/guard-integration.tap` |
 | Complete run and parameters | `just reproduce` | `out/report.md`, `out/provenance.json` |
 | Recorded terminal demonstration | `just demo` | `out/demo/demo.cast`, captions and transcript |
@@ -69,16 +69,18 @@ See [validation and remaining release work](results/VALIDATION.md). Re-running a
 
 | Evidence | Implementation |
 |---|---|
-| Naive versus CAS reservation race; stable loser proof | `offchain/eval/flat-reservation.ts` |
+| Naive versus enforced-public-guard reservation race; stable loser proof | `offchain/eval/flat-reservation.ts` |
 | Finite-state classification checks | `offchain/eval/classify-exhaustive.ts` |
 | Proof time and size | `offchain/eval/bench.ts` |
 | Contract gas and operation costs | `offchain/eval/gas.ts` |
 | Contract and off-chain robustness | `test/`, `offchain/test/`, `offchain/features/` |
 | Ideal set-model proofs | `verification/lean/` |
 
-The race demonstrates prevention of a second reservation when the issuer verifies a true guard and declares the correct CAS policy. The contract does not evaluate the query or verify the guard proof. Pairing checks do not enforce all set relations against an issuer who knows the accumulator secret. Read the [trust boundary](design/ARTIFACT-CONTRACT.md) before interpreting the results.
+The race demonstrates prevention of a second reservation by current-state public guard evaluation, including raw issuer calls with fabricated proof bytes. The guarantee starts when the intended program is bound. The issuer still chooses the initial policy and can censor or order updates. Programs are executable semantics; query text is descriptive and clients check compilation correspondence. Empty public programs mean true. A newly created credential definition has its own policy and is not a substitute for the one a verifier accepted.
 
-[Historical evaluation](design/EVALUATION.md) and [OP Sepolia evidence](design/OP-SEPOLIA-RUN.md) are retained with their original provenance. Local reproduction does not redeploy contracts or establish current testnet performance.
+The [current claim-to-evidence map](design/CLAIM-EVIDENCE.md) separates contract enforcement, model assumptions and unsupported private guards. Private presentations remain available off-chain under their documented assumptions. Proof bytes emitted for public updates are audit data; they do not authorize the transition.
+
+[Historical evaluation](design/EVALUATION.md) and [OP Sepolia evidence](design/OP-SEPOLIA-RUN.md) retain their provenance. Local reproduction does not redeploy contracts or establish current testnet performance.
 
 ## Contributions
 

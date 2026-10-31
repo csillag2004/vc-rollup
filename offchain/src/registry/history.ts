@@ -1,5 +1,5 @@
 // What anyone can know about a registry from the ledger: its values at every version,
-// the ordered revocation log, the keys, the SRS and the issuer's BBS key (from the DID document).
+// the issued and revoked IDs with their versions, the keys, the SRS and the issuer's BBS key (from the DID document).
 import type { PublicKeys, RegistryValues, Srs } from '../crypto/accumulator.ts';
 import { refreshReceiptA, refreshReceiptRtilde, valuesHash } from '../crypto/accumulator.ts';
 import { g1ToEip, g2ToEip, type G1Point, type G2Point } from '../crypto/bls.ts';
@@ -11,6 +11,8 @@ export interface RegistryHistory {
   srs?: Srs;
   /** values[v] = registry values at version v */
   values: RegistryValues[];
+  /** revocation ID -> version at which it was issued (issuance reveals y) */
+  issuedAt: Map<bigint, number>;
   /** revocation ID -> version at which it was revoked */
   revokedAt: Map<bigint, number>;
   /** BBS public key of the CredDef's issuer */
@@ -22,6 +24,9 @@ export const currentVersion = (h: RegistryHistory): number => h.values.length - 
 export function revokedUpTo(h: RegistryHistory, v: number): Set<bigint> {
   return new Set([...h.revokedAt].filter(([, at]) => at <= v).map(([y]) => y));
 }
+
+/** the number of IDs issued up to v (the contract's issuedCount at v) */
+export const issuedCountAt = (h: RegistryHistory, v: number): number => [...h.issuedAt.values()].filter((at) => at <= v).length;
 
 /** revocations in (from, to], in order */
 export function revocationsBetween(h: RegistryHistory, from: number, to: number): [bigint, number][] {

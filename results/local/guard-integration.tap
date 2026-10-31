@@ -1,4 +1,4 @@
-✔ issuer validates guard proofs and contract atomically rejects stale group/global versions (3712.107561ms)
+✔ ledger enforces public truth, permanent policies and the private-guard boundary (2880.584421ms)
 ℹ tests 1
 ℹ suites 0
 ℹ pass 1
@@ -6,4 +6,4 @@
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 3923.162227
+ℹ duration_ms 3095.227185

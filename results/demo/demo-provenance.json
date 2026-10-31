@@ -1,5 +1,6 @@
 {
   "schemaVersion": 1,
+  "implementationProfile": "public-guards-v1",
   "mode": "demo",
   "smoke": false,
   "network": {
@@ -8,10 +9,10 @@
   },
   "success": true,
   "error": null,
-  "startedAt": "2026-10-31T17:10:39.750Z",
-  "finishedAt": "2026-10-31T17:10:45.985Z",
-  "elapsedSeconds": 6.235,
-  "revision": "622a9fe3012a5ce73d27cd97176846558fad929b",
+  "startedAt": "2026-10-31T19:13:45.868Z",
+  "finishedAt": "2026-10-31T19:13:59.046Z",
+  "elapsedSeconds": 13.178,
+  "revision": "a2d0cf26823917e767e55532bd240819608fc29e",
   "dirty": "",
   "platform": {
     "os": "linux",
@@ -43,6 +44,6 @@
     "cryptoRandomness": "OS CSPRNG; fresh keys, IDs and proof blinding each run"
   },
   "sha256": {
-    "demo-report.md": "ed2f1964e3cef85015c6b7a472a41d222aa241603478f7d6898dcff34db71403"
+    "demo-report.md": "70b7b2944d1ef33127a09530b60c6b63b52c4b70f71315bf822bc9e2384f767d"
   }
 }

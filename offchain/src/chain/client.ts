@@ -1,5 +1,5 @@
-// Chain access with ethers: deployment from forge artifacts, contract calls, and the
-// RegistryHistory that anyone can rebuild from events.
+// Chain access with ethers: deployment from forge artifacts, contract calls, the RegistryHistory
+// that anyone can rebuild from events, and the guard proofs guarded updates leave on the ledger.
 import { ethers } from 'ethers';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -9,6 +9,7 @@ import {
 } from '../crypto/bls.ts';
 import type { PublicKeys, RegistryValues, Srs } from '../crypto/accumulator.ts';
 import type { RegistryHistory } from '../registry/history.ts';
+import type { Presentation } from '../ql/compile.ts';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
@@ -119,27 +120,42 @@ export async function readHistory(d: Deployment, registryId: string): Promise<Re
     ? { g1Powers: srsEv.args.g1Powers.map((h: string) => g1FromEip(h)), g2Powers: srsEv.args.g2Powers.map((h: string) => g2FromEip(h)) }
     : undefined;
 
-  type Step = { version: number; apply: (v: RegistryValues) => RegistryValues; y?: bigint };
+  // issuance and revocation both reveal y
+  type Step = { version: number; y: bigint; into: Map<bigint, number>; apply: (v: RegistryValues) => RegistryValues };
+  const issuedAt = new Map<bigint, number>();
+  const revokedAt = new Map<bigint, number>();
   const steps: Step[] = [];
   for (const e of (await events(d, st, st.filters.Issued!(registryId))) as ethers.EventLog[]) {
     const I = g1FromEip(e.args.newI), WIR = g1FromEip(e.args.newWIR);
-    steps.push({ version: Number(e.args.version), apply: (v) => ({ ...v, I, WIR }) });
+    steps.push({ version: Number(e.args.version), y: BigInt(e.args.y), into: issuedAt, apply: (v) => ({ ...v, I, WIR }) });
   }
   for (const e of (await events(d, st, st.filters.Revoked!(registryId))) as ethers.EventLog[]) {
     const A = g1FromEip(e.args.newA), Rtilde = g2FromEip(e.args.newRtilde), WIR = g1FromEip(e.args.newWIR);
-    steps.push({ version: Number(e.args.version), y: BigInt(e.args.y), apply: (v) => ({ ...v, A, Rtilde, WIR }) });
+    steps.push({ version: Number(e.args.version), y: BigInt(e.args.y), into: revokedAt, apply: (v) => ({ ...v, A, Rtilde, WIR }) });
   }
   steps.sort((a, b) => a.version - b.version);
   const values: RegistryValues[] = [{ A: pub.V0, Rtilde: g2, I: g1, WIR: g1 }];
-  const revokedAt = new Map<bigint, number>();
   for (const s of steps) {
     if (s.version !== values.length) throw new Error(`gap in history at version ${s.version}`);
     values.push(s.apply(values[values.length - 1]!));
-    if (s.y !== undefined) revokedAt.set(s.y, s.version);
+    s.into.set(s.y, s.version);
   }
   const issuer: string = await d.credDefs.issuerOf!(credDefId);
   const issuerPk = await resolveBbsKey(d, issuer);
-  return { registryId, credDefId, pub, ...(srs ? { srs } : {}), values, revokedAt, issuerPk };
+  return { registryId, credDefId, pub, ...(srs ? { srs } : {}), values, issuedAt, revokedAt, issuerPk };
+}
+
+/** the guard proof is the presentation as UTF-8 JSON: deterministic for a given presentation, and readable back */
+export const encodeGuardProof = (p: Presentation): Uint8Array => ethers.toUtf8Bytes(JSON.stringify(p));
+export const decodeGuardProof = (proof: ethers.BytesLike): Presentation => JSON.parse(ethers.toUtf8String(proof));
+
+export interface GuardProofRecord { registryId: string; version: number; policyId: string; presentation: Presentation }
+
+/** the proof of the guarded update that created `version` of the registry (GuardProof event) */
+export async function readGuardProof(d: Deployment, registryId: string, version: number): Promise<GuardProofRecord> {
+  const e = (await events(d, d.state, d.state.filters.GuardProof!(registryId, version)))[0] as ethers.EventLog | undefined;
+  if (!e) throw new Error(`no guarded update created version ${version} of ${registryId}`);
+  return { registryId, version, policyId: e.args.policyId, presentation: decodeGuardProof(e.args.proof) };
 }
 
 export const yHex = (y: bigint): string => scalarToHex32(y);

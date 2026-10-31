@@ -4,7 +4,7 @@ import { parse } from '../src/ql/parser.ts';
 import { present, verifyPresentation, type PublicContext, type WalletCredential } from '../src/ql/compile.ts';
 import { MemoryRegistry } from '../src/registry/memory.ts';
 import * as bbs from '../src/crypto/bbs.ts';
-import { utf8ToBytes, randomScalar } from '../src/crypto/bls.ts';
+import { utf8ToBytes, randomScalar, mod, inv, g1 } from '../src/crypto/bls.ts';
 
 async function world() {
   const kp = await bbs.generateKeyPair();
@@ -122,7 +122,7 @@ import { validateGuardPresentation, type PolicyRef } from '../src/actors/actors.
 
 test('trusted updater rejects invalid and uncovered proofs while preserving CAS versions', async () => {
   const { reg, ctx, alice, members } = await world();
-  const policy = (query: string, context = ctx): PolicyRef => ({ policyId: 'test-policy', query, bindings: [...context.bindings] });
+  const policy = (query: string, context = ctx): Pick<PolicyRef, 'policyId' | 'query' | 'bindings'> => ({ policyId: 'test-policy', query, bindings: [...context.bindings] });
   const q = 'forall x in S. NotRevoked(x)';
   const { p } = run(q, ctx, []);
   assert.doesNotThrow(() => validateGuardPresentation(policy(q), p, ctx));
@@ -161,7 +161,7 @@ test('public proofs authenticate every claimed history version', async () => {
   reg.revoke(members[0]!);
   const query = 'exists x in S. Revoked(x)';
   const p = run(query, ctx, []).p;
-  const policy: PolicyRef = { policyId: 'test-policy', query, bindings: [...ctx.bindings] };
+  const policy: Pick<PolicyRef, 'policyId' | 'query' | 'bindings'> = { policyId: 'test-policy', query, bindings: [...ctx.bindings] };
   for (const v of [reg.h.values.length, -1, 0.5, Number.NaN]) {
     const bad = { ...p, versions: { ...p.versions, '0xreg': v } };
     assert.equal(verifyPresentation(parse(query), bad, ctx).ok, false);
@@ -171,4 +171,45 @@ test('public proofs authenticate every claimed history version', async () => {
   assert.equal(verifyPresentation(parse(query), unknown, ctx).ok, false);
   reg.issue(randomScalar());
   assert.doesNotThrow(() => validateGuardPresentation(policy, p, ctx));
+});
+
+
+test('whole-registry predicates use ledger counts despite trapdoor-chosen accumulator collisions', () => {
+  const reg = new MemoryRegistry('collision', 'cd', new Uint8Array());
+  const alpha = reg.secret.alpha;
+  // Both issued IDs are valid and distinct, but their polynomial at alpha is one.
+  const y1 = mod(2n - alpha), y2 = mod(inv(2n) - alpha);
+  reg.issue(y1);
+  reg.issue(y2);
+  assert.equal(reg.values.I.equals(g1), true);
+  const ctx: PublicContext = { registries: new Map([['collision', reg.h]]),
+    bindings: new Map([['Issued', { kind: 'registry', registryId: 'collision' }]]) };
+  assert.throws(() => run('forall x in Issued. Revoked(x)', ctx, []), /query is false/);
+  assert.equal(run('exists x in Issued. NotRevoked(x)', ctx, []).v.ok, true);
+  reg.revoke(y1);
+  reg.revoke(y2);
+  assert.throws(() => run('forall x in Issued. NotRevoked(x)', ctx, []), /query is false/);
+  assert.equal(run('exists x in Issued. Revoked(x)', ctx, []).v.ok, true);
+});
+
+test('presentations cannot relabel a signed credential definition or its message roles', async () => {
+  const { ctx, alice } = await world();
+  const history = ctx.registries.get('0xreg')!;
+  const relabeledContext: PublicContext = {
+    registries: new Map([['other-reg', { ...history, registryId: 'other-reg', credDefId: 'other-cd' }]]),
+    bindings: new Map([['Target', { kind: 'creddef', credDefId: 'other-cd' }]]),
+  };
+  const relabeled = { ...alice, registryId: 'other-reg', credDefId: 'other-cd' };
+  const result = run('exists x in Presented. Sig(x, "Target")', relabeledContext, [relabeled]);
+  assert.equal(result.v.ok, false);
+  assert.match(result.v.reason!, /signed header/);
+
+  const q = 'exists x in Presented. Sig(x, "Landlord")';
+  // These are newly generated proofs with altered metadata, not corrupted transcripts.
+  // Even a mathematically valid equality at the wrong signed position must be rejected.
+  for (const changed of [{ ...alice, yIndex: 1 }, { ...alice, lsIndex: 1 }]) {
+    const v = run(q, ctx, [changed]).v;
+    assert.equal(v.ok, false);
+    assert.match(v.reason!, /message roles/);
+  }
 });

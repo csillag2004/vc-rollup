@@ -1,57 +1,61 @@
 WEBVTT
 
 1
-00:00:00.055 --> 00:00:00.065
+00:00:00.276 --> 00:00:00.286
 $ node offchain/eval/artifact.ts demo
 
 2
-00:00:00.055 --> 00:00:00.713
-Fresh local Prague chain: http://127.0.0.1:33081
+00:00:00.276 --> 00:00:02.195
+Fresh local Prague chain: http://127.0.0.1:36071
 
 3
-00:00:00.713 --> 00:00:02.728
+00:00:02.195 --> 00:00:05.805
 deployed StateRegistry at 0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9
 
 4
-00:00:02.728 --> 00:00:03.169
+00:00:05.805 --> 00:00:06.428
 naive: both guards hold at the same state: true / true
 
 5
-00:00:03.169 --> 00:00:04.917
+00:00:06.428 --> 00:00:07.503
 naive: revoked members of S after the race: 2 (the flat is booked twice)
 
 6
-00:00:04.917 --> 00:00:05.106
-cas: Alice's guarded revocation accepted (gas 696897)
+00:00:07.503 --> 00:00:11.649
+separate stable fixture: proof survives actual later issuance and revocation in its registry: true
 
 7
-00:00:05.106 --> 00:00:05.171
-cas: Bob's guarded revocation rejected: StaleGroupVersion
+00:00:11.649 --> 00:00:11.785
+guarded: Alice's guarded revocation accepted (gas 717987)
 
 8
-00:00:05.171 --> 00:00:05.303
-cas: Bob's guard proof is cryptographically valid (true) but no longer fresh (group S moved from version 0 to 1)
+00:00:11.785 --> 00:00:12.132
+guarded: Alice's guard proof read back from the GuardProof event of version 4: valid true
 
 9
-00:00:05.303 --> 00:00:05.985
-loser's proof ∃x∈S.Revoked(x): valid true, class stable
+00:00:12.132 --> 00:00:12.274
+guarded: Bob's guarded revocation rejected: GuardFalse
 
 10
-00:00:05.985 --> 00:00:06.051
-later update: landlord binds the stable taken-flat policy and revokes a newly issued credential outside S
+00:00:12.274 --> 00:00:12.523
+guarded: Bob's guard proof is cryptographically valid (true) but no longer fresh (group S moved from version 0 to 1)
 
 11
-00:00:06.051 --> 00:00:06.473
-loser's proof after later updates: valid true
+00:00:12.523 --> 00:00:13.053
+loser's proof ∃x∈S.Revoked(x): valid true, class stable
 
 12
-00:00:06.473 --> 00:00:06.483
-Alice: "one of S, signed by the landlord, revoked": true (class stable)
+00:00:13.053 --> 00:00:14.182
+loser's proof after later updates: valid true
 
 13
-00:00:06.473 --> 00:00:06.702
-PASS: naive double booking reproduced; atomic CAS rejected the loser; holder proofs verified.
+00:00:14.182 --> 00:00:14.192
+Alice: "one of S, signed by the landlord, revoked": true (class stable)
 
 14
-00:00:06.702 --> 00:00:09.702
-Completed demo; evidence in <repo>/out/publish-demo
+00:00:14.182 --> 00:00:14.890
+PASS: naive double booking reproduced; on-chain public evaluation rejected the loser; holder proofs verified.
+
+15
+00:00:14.890 --> 00:00:17.890
+Completed demo; evidence in /tmp/vc-enforced-demo

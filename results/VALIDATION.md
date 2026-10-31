@@ -1,46 +1,38 @@
-# Validation record
+# Validation record: ledger-enforced public guards
 
-Full local evidence and the terminal recording were generated from [source 622a9fe](https://github.com/csillag2004/vc-rollup/commit/622a9fe3012a5ce73d27cd97176846558fad929b) with a clean worktree. No OP Sepolia deployment or live measurements were performed.
+Full local measurements and the demo were generated from [source a2d0cf2](https://github.com/csillag2004/vc-rollup/commit/a2d0cf26823917e767e55532bd240819608fc29e), with a clean worktree. This is the `public-guards-v1` profile, not the earlier reduced implementation. No live deployment or paper-source edit was performed.
 
 | Check | Result |
 |---|---|
-| Solidity format, build and tests | PASS, 88 tests |
-| TypeScript typecheck and unit tests | PASS, 16 tests |
+| Solidity format/build/tests | PASS, 109 tests across three suites, including two fuzz tests with 256 runs each |
+| TypeScript typecheck/unit tests | PASS, 21 tests |
 | Rust front end | PASS, 62 tests |
-| WebAssembly interface | PASS, parser/error cases and 2,000 repeated calls |
-| Lean sealed specification, build and axiom audit | PASS, all 33 frozen targets; recursive forbidden-mechanism scan |
-| Full local reproduction | PASS, 61.187 seconds, outputs under `local/` |
-| BDD | PASS, 15 scenarios and 118 steps |
-| Classification | PASS, 3,000 formulas in each of two models, zero bounded violations |
-| Robustness | PASS, 17 named contract cases and actor integration |
-| Demo recording | PASS, parsed asciinema v2 with monotonic timestamps; see `demo/` |
-| Container | Build PASS at the recorded source; smoke reproduction PASS on its immediate predecessor before path normalization (45.44 seconds) |
-| Source archive | PASS, fresh dependency recovery and Solidity/Rust build; both Lean seals preserved |
-| Citation metadata | PASS, CFF 1.2 schema validation |
-| npm dependency audit | PASS, zero reported vulnerabilities at validation time |
-| Current-tree publication hygiene | PASS; two historical private-source-link warnings remain |
-| Normal secrets scan | PASS with the three exact historical fingerprints baselined |
-| Strict publication gates | BLOCKED: historical keys and private-source links |
+| WASM interface | PASS, parser/error cases and 2,000 repeated calls |
+| Lean seals, build and axiom audit | PASS, frozen model unchanged, 33 audited targets |
+| Full local reproduction | PASS, 118.267 seconds; [raw outputs and hashes](local/provenance.json) |
+| BDD | PASS, 21 scenarios, 235 steps; private policy binding checked for rejection |
+| Bounded classification | PASS, 3,000 sampled formulas in each of two models, zero observed violations |
+| Required contract robustness | PASS, 24 cases, including raw issuer, policy locking, private rejection and cross-registry public guards |
+| Actor integration | PASS, policy checks, raw false-guard rejection, private rejection and event proof/digest round-trip |
+| Container | Build and smoke reproduction PASS at the measured source revision |
+| Demo | PASS, actual asciinema v2 recording, monotonic timestamps, matching clean source revision |
+| Current-tree hygiene | PASS, no errors; two historical private-source warnings remain |
+| Baseline secrets scan | PASS; strict publication remains blocked by known historical exposures |
 
-The container smoke used [the implementation checkpoint](https://github.com/csillag2004/vc-rollup/commit/66f716aeb6d8491811e164e138c58a11918b478b). The following commit only normalizes checkout paths in recorded logs; the container image was rebuilt successfully after that change. Full native reproduction and the demo use the later revision shown above. No published image, results tag or DOI is claimed.
+The full native run used a shared development host, including other validation workloads. Timing means/ranges are observations, not isolated latency estimates or evidence of monotonic scaling. The derived evaluation reports non-monotone timing series explicitly. Its renderer was subsequently corrected to derive those statements from the data; `evaluation/derivation.json` records the renderer and output hashes separately from the measurement revision.
 
-The formula sampler has a fixed seed. Crypto randomness is intentionally fresh, and wall-clock measurements were taken on a shared development host. Each proof case includes one warm-up and three paired generation/verification samples. Gas and calldata come from actual transaction receipts/input. These measurements are not L1 data fees or concurrency/load guarantees.
+The [evaluation](evaluation/evaluation.md) includes public-guard correctness, bounded classification, proof time/size, group creation cost, and controlled update costs. The three control paths restore the same snapshot before revoking the same ID. They compare full call cost including proof bytes/events, not a single opcode or a universal overhead. The action is unbound for those controls so the bare path remains callable; permanently bound paths are measured separately.
 
-## Companion evaluation
+All committed raw-output hashes were verified before rendering. The renderer rejects reduced-design provenance. Its figures are standalone SVG/PNG; the new controlled-cost figure was visually inspected. The demo and raw result files retain the original revision and parameters. Earlier results are preserved under [historical/reduced](historical/reduced/VALIDATION.md).
 
-The [written evaluation](evaluation/evaluation.md) answers four research questions using the unchanged full-run data. It includes reproducible SVG/PNG figures, observed timing ranges, per-operation gas/calldata, interpretation and threats to validity. The renderer verifies the raw-output hashes before deriving any figure; a deliberately modified CSV was rejected. `just reproduce` now generates this analysis after the measurements, and `just figures results/local out/evaluation` rebuilds it independently.
+## Completed scope and remaining work
 
-Both native and container smoke reproduction passed with the evaluation stage included. SVGs were parsed, figures visually inspected, and derived hashes verified.
-
-The evaluation is confined to this code repository. No paper chapter was edited.
-
-## Completion and release boundary
-
-- DONE: inspect Markdown and all eight merged PRs; use the user-selected reduced design.
-- DONE: validate guarded submissions, bind CAS dependencies, reject invalid history versions, and retain regression coverage.
-- DONE: align the documentation and ideal-model limitations; preserve frozen seals and Rust front-end attribution.
-- DONE: provide pinned native/container/archive setup, CI, machine-readable experiments and a recorded demo.
-- DONE: run full local measurements and retain exact output hashes/provenance.
-- DEFERRED by the selected scope: OP Sepolia redeployment and new live measurements.
-- BLOCKED for publication: key remediation and coordinated history/private-reference cleanup. See [release status](../design/SECURITY-RELEASE.md). This does not prevent review of the PR.
-- NOT PERFORMED: PR merge, release publication and Zenodo deposit.
+- DONE: public issuance IDs, lifecycle storage checks, issued-only groups, validated public policy programs and atomic public guard evaluation.
+- DONE: permanent nonzero update-policy bindings; private update guards rejected both at binding and execution, even on unbound actions.
+- DONE: client ABI/compiler alignment, full proof-byte events, guard evidence retrieval, signed-header/message-role checks and collision-resistant public count semantics.
+- DONE: adversarial tests, reproducible local evaluation, controlled gas comparisons, figures, demonstration and [current paper evidence map](../design/CLAIM-EVIDENCE.md).
+- DEFERRED: private update guards. The existing status sigma proof accepts a trapdoor-forged witness; a regression demonstrates the counterexample. Sound private authorization requires a different ledger-membership construction. Off-chain presentations remain available with this limitation.
+- DEFERRED: historical BBS key resolution across rotation, larger contention workloads and holder witness-refresh scaling.
+- DEFERRED by authorization: OP Sepolia redeployment; preparation remains in [release status](../design/SECURITY-RELEASE.md).
+- BLOCKED for publication: historical key remediation and private-source cleanup. This reviewable artifact is not a release or a Zenodo deposit.
+- NOT PERFORMED: merge or paper changes.

@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "mode": "reproduce",
+  "smoke": false,
+  "network": {
+    "target": "anvil",
+    "chainId": 31337
+  },
+  "success": true,
+  "error": null,
+  "startedAt": "2026-10-31T17:10:38.555Z",
+  "finishedAt": "2026-10-31T17:11:39.742Z",
+  "elapsedSeconds": 61.187,
+  "revision": "622a9fe3012a5ce73d27cd97176846558fad929b",
+  "dirty": "",
+  "platform": {
+    "os": "linux",
+    "release": "7.2.8-9-omarchy",
+    "architecture": "x64",
+    "cpu": "AMD Ryzen 9 7950X3D 16-Core Processor",
+    "logicalCpus": 32,
+    "totalMemoryBytes": 100830253056
+  },
+  "tools": {
+    "node": "v26.7.0",
+    "forge": "forge Version: 1.8.6\nCommit SHA: 6bad0a66de7c83f7b33695044138f0f5fa4c5990\nBuild Timestamp: 2026-10-21T17:56:11.890310850Z (1792605371)\nBuild Profile: dist",
+    "anvil": "anvil Version: 1.8.6\nCommit SHA: 6bad0a66de7c83f7b33695044138f0f5fa4c5990\nBuild Timestamp: 2026-10-21T17:56:11.890310850Z (1792605371)\nBuild Profile: dist",
+    "solc": "solc, the solidity compiler commandline interface\nVersion: 0.8.30+commit.73712a01.Linux.g++"
+  },
+  "parameters": {
+    "hardfork": "prague",
+    "classificationSeed": 2026,
+    "formulasPerModel": 3000,
+    "universeSize": 4,
+    "maxFormulaDepth": 4,
+    "proofWarmups": 1,
+    "proofSamples": 3,
+    "groupSizes": [
+      4,
+      16,
+      64
+    ],
+    "cryptoRandomness": "OS CSPRNG; fresh keys, IDs and proof blinding each run"
+  },
+  "sha256": {
+    "classification.csv": "1592a1ca568691e4524d5e84ec807841112762d4f1b780aa1dea7c64ad9435a9",
+    "bdd.log": "95df340e8993ed366d062c7ca4144d997d8fdcfbd3fe3720ee885ca2623b6e22",
+    "bdd.json": "ab9167cc3fe441c025860da1d8479fc1f8404fd5abab81df7a3e3dc9475e145b",
+    "correctness.csv": "6f1ae7ea769911f4bdf0ba71312a48b0e0b94023354099303ea94056917d7310",
+    "reservation.json": "46571f8a582ebd8d58552d0fcde5b0efb0600f712d88aac354ba531066e1176f",
+    "scalability.csv": "013512955076c0dad0dd741e4c4bb0ba0606ae38c972d8b8f4c8bc2eceab1eca",
+    "gas.csv": "e659e4b81da0a1ddbad0cef8bdf7245346154ea1a3dec91dd790b077b0894b6c",
+    "robustness-forge.json": "8eab2dd1cd6e426aaf685ef5d78938a18c2c763cea13c8db9cccb50e42f669af",
+    "guard-integration.tap": "550abc8ccc131a89ebc3b69ee0ec83848c9e0bc61be41d8e39d39de092beb9af",
+    "robustness.csv": "57b97affddb92069a693df5426680b18afc6e6ef8bb68119c6eacf72baf7bad6",
+    "reproduce-report.md": "d7bea06a3e5b4fa4cb6b3ffe43c1ba3762116f01e926915637311abb35b5bb97",
+    "report.md": "d7bea06a3e5b4fa4cb6b3ffe43c1ba3762116f01e926915637311abb35b5bb97"
+  }
+}

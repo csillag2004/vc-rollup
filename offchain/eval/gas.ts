@@ -39,46 +39,50 @@ export async function runGas(rpc = RPC, smoke = false): Promise<GasRow[]> {
   const reg = await issuer.createRegistry('gas-main', 16);
   const holders = Array.from({ length: 16 }, () => new Holder(d));
   for (const [i, h] of holders.entries()) {
-    const w = await record('issueUpdate', i === 0 ? 'Schnorr + 2 pairing checks' : 'repeated', () => issuer.issue(reg, ['flat', `h${i}`], h.linkSecret));
+    const w = await record('issueUpdate', i === 0 ? 'public ID + 2 pairing checks' : 'repeated', () => issuer.issue(reg, ['flat', `h${i}`], h.linkSecret));
     h.wallet.push(w);
   }
   const ys = holders.map((h) => h.wallet[0]!.scalars[0]!);
   for (const n of [2, 4, 8, 16]) {
-    await record('createGroup', `|S| = ${n} (on-chain [P_S]_2 + subset check)`, () => issuer.createGroup(reg, `g${n}`, ys.slice(0, n)));
+    await record('createGroup', `|S| = ${n} (issued-ID storage checks)`, () => issuer.createGroup(reg, `g${n}`, ys.slice(0, n)));
   }
-  await record('revoke', 'step + consistency + subset (3 pairing checks)', () => issuer.revoke(reg, ys[15]!));
+  // All control variants start from the identical state, with all policies already registered.
+  // The action is unbound here so its bare path is callable. The later bound-policy row is separate.
+  const g = await readGroup(d, await issuer.createGroup(reg, 'control-group', ys.slice(0, 4)));
+  const pGroup = await record('registerPolicy', 'public group predicate', () =>
+    issuer.registerPolicy('forall x in S. NotRevoked(x)', [['S', g]]));
+  const pRegistry = await issuer.registerPolicy('forall x in Issued. NotRevoked(x)',
+    [['Issued', { kind: 'registry', registryId: reg }]]);
+  const groupProof = await holders[0]!.present(pGroup.query, pGroup.bindings, 'control-group');
+  const registryProof = await holders[0]!.present(pRegistry.query, pRegistry.bindings, 'control-registry');
+  const isolated = async (fn: () => Promise<unknown>) => {
+    const snapshot: string = await provider.send('evm_snapshot', []);
+    try { await fn(); } finally {
+      if (!await provider.send('evm_revert', [snapshot])) throw new Error('failed to restore gas control state');
+    }
+  };
+  await isolated(() => record('revoke', 'control: bare update, identical pre-state', () => issuer.revoke(reg, ys[0]!)));
+  await isolated(() => record('guardedRevoke', 'control: public group guard, identical pre-state', () =>
+    issuer.guardedRevoke(reg, ys[0]!, pGroup, groupProof)));
+  await isolated(() => record('guardedRevoke', 'control: public registry guard, identical pre-state', () =>
+    issuer.guardedRevoke(reg, ys[0]!, pRegistry, registryProof)));
 
-  // guarded revocations: one per CAS mode, each on its own group
-  const g = await readGroup(d, await issuer.createGroup(reg, 'guard-group', ys.slice(4, 8)));
-  const gs = await readGroup(d, await issuer.createGroup(reg, 'guard-stable', ys.slice(8, 12)));
-  const pGroup = await record('registerPolicy', 'co-stable, group CAS', () => issuer.registerPolicy('forall x in S. NotRevoked(x)', [['S', g]]));
-  const globalGroup = await readGroup(d, await issuer.createGroup(reg, 'guard-global', ys.slice(2, 4)));
-  const pGlobal = await issuer.registerPolicy('(forall x in S. NotRevoked(x)) & (exists y in Issued. Revoked(y))', [['S', globalGroup], ['Issued', { kind: 'registry', registryId: reg }]]);
-  await issuer.revoke(reg, ys[14]!);
-  const pStable = await issuer.registerPolicy('exists x in S. Revoked(x)', [['S', gs]]);
-  await issuer.revoke(reg, ys[8]!);
-
-  const globalProof = await holders[2]!.present(pGlobal.query, pGlobal.bindings, 'global');
-  await record('guardedRevoke', 'global CAS (policy lookup + registry versions)', () => issuer.guardedRevoke(reg, ys[2]!, pGlobal, globalProof));
-  const h4 = holders[4]!;
-  const pres = await h4.present(pGroup.query, pGroup.bindings, 'g');
-  await record('guardedRevoke', 'group CAS (policy lookup + group version)', () => issuer.guardedRevoke(reg, ys[4]!, pGroup, pres));
-  const presS = await holders[9]!.present(pStable.query, pStable.bindings, 's');
-  await record('guardedRevoke', 'stable guard, no comparison', () => issuer.guardedRevoke(reg, ys[9]!, pStable, presS));
-  // Issuance guarded by a still-true co-stable group predicate.
-  const issueGroup = await readGroup(d, await issuer.createGroup(reg, 'issue-guard', ys.slice(0, 2)));
-  const issuePolicy = await issuer.registerPolicy('forall x in S. NotRevoked(x)', [['S', issueGroup]]);
-  const issueProof = await holders[0]!.present(issuePolicy.query, issuePolicy.bindings, 'guarded-issue');
-  await record('guardedIssueUpdate', 'group CAS + Schnorr + 2 pairing checks', () =>
-    issuer.issue(reg, ['flat', 'guarded-holder'], holders[0]!.linkSecret, { policy: issuePolicy, presentation: issueProof }));
+  await (await d.policies.bindPolicy!(issuer.credDefId, 1, pGroup.policyId)).wait();
+  await record('guardedRevoke', 'permanently bound public group guard', () =>
+    issuer.guardedRevoke(reg, ys[0]!, pGroup, groupProof));
+  const issueGroup = await readGroup(d, await issuer.createGroup(reg, 'issue-guard', ys.slice(8, 12)));
+  const issuePolicy = await issuer.registerPolicy('forall x in S. NotRevoked(x)', [['S', issueGroup]], 'issue');
+  const issueProof = await holders[8]!.present(issuePolicy.query, issuePolicy.bindings, 'guarded-issue');
+  await record('guardedIssueUpdate', 'permanently bound public group guard + public ID', () =>
+    issuer.issue(reg, ['flat', 'guarded-holder'], holders[8]!.linkSecret, { policy: issuePolicy, presentation: issueProof }));
   return rows;
 }
 
 export function gasTable(rows: GasRow[]): string {
   const merged = new Map<string, { operation: string; detail: string; gas: bigint[] }>();
   for (const r of rows) {
-    const k = `${r.operation}|${r.detail === 'repeated' ? 'Schnorr + 2 pairing checks' : r.detail}`;
-    const m = merged.get(k) ?? { operation: r.operation, detail: r.detail === 'repeated' ? 'Schnorr + 2 pairing checks' : r.detail, gas: [] };
+    const k = `${r.operation}|${r.detail === 'repeated' ? 'public ID + 2 pairing checks' : r.detail}`;
+    const m = merged.get(k) ?? { operation: r.operation, detail: r.detail === 'repeated' ? 'public ID + 2 pairing checks' : r.detail, gas: [] };
     m.gas.push(r.gas.reduce((a, b) => a + b, 0n));
     merged.set(k, m);
   }

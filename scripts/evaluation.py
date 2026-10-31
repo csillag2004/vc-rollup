@@ -28,6 +28,8 @@ def main():
     provenance = json.loads((source / "reproduce-provenance.json").read_text())
     if not provenance["success"] or provenance["mode"] != "reproduce":
         raise ValueError("evaluation needs a successful reproduction, not a partial run")
+    if provenance.get("implementationProfile") != "public-guards-v1":
+        raise ValueError("this renderer requires public-guards-v1 measurements; older reduced evidence remains historical")
     for name, expected in provenance["sha256"].items():
         if digest(source / name) != expected:
             raise ValueError(f"measurement hash mismatch: {name}")
@@ -131,10 +133,28 @@ def main():
     gas_table = "\n".join(f"| {n} | {g:,} | {b:,} |" for n, g, b in group_gas)
     actions = [r for r in gas if r["operation"] in ["revoke", "guardedRevoke", "guardedIssueUpdate"]]
     action_table = "\n".join(f"| {r['operation']} | {r['detail']} | {int(r['gas']):,} | {int(r['calldata_bytes']):,} |" for r in actions)
-    scaling_answer = ("**Smoke data are a pipeline check, not a scaling evaluation.** Use a full run for the conclusions and dimensions below." if provenance["smoke"] else "**Both tested dimensions increase computation, while they affect proof size differently.** Requiring more active credentials adds credential and distinctness evidence. Hidden membership in a larger anchored group keeps the measured encoded proof size fixed while increasing the measured work.")
-    text = f"""# Evaluation of the reduced credential-registry prototype
+    controls = [r for r in actions if r["detail"].startswith("control:")]
+    if len(controls) != 3:
+        raise ValueError("expected three controlled update paths")
+    bare = next(int(r["gas"]) for r in controls if r["operation"] == "revoke")
+    overhead_table = "\n".join(f"| {r['detail'].removeprefix('control: ')} | {int(r['gas']):,} | {int(r['gas']) - bare:+,} |" for r in controls)
+    fig, ax = plt.subplots(figsize=(7, 3.4), layout="constrained")
+    ax.bar(["Bare update", "Public group guard", "Public registry guard"],
+           [int(r["gas"]) / 1000 for r in controls], color=["#777777", "#176b92", "#a64b1a"])
+    ax.set(ylabel="Gas (thousands)", title="Update paths from an identical snapshotted state")
+    ax.grid(axis="y", alpha=.2)
+    save(fig, "guard-overhead")
+    def timing_trend(cases, column):
+        means = [statistics.mean(float(row[column]) for row in samples) for _, samples in sorted(cases.items())]
+        return "increases at every tested size" if all(a < b for a, b in zip(means, means[1:])) else "does not increase monotonically across the tested sizes"
 
-{mode}. This evaluation answers four questions about the implemented trusted-issuer/updater design. It combines functional scenarios, bounded semantic checks and measured proof/EVM costs under the documented trust assumptions.
+    scaling_answer = ("**Smoke data are a pipeline check, not a scaling evaluation.** Use a full run for the conclusions and dimensions below." if provenance["smoke"] else
+        f"For the threshold cases, mean generation time {timing_trend(thresholds, 'prove_ms')} and mean verification time {timing_trend(thresholds, 'verify_ms')}. "
+        f"For the hidden group-member cases, mean generation time {timing_trend(groups, 'prove_ms')} and mean verification time {timing_trend(groups, 'verify_ms')}. "
+        "The sample ranges show measurement variability. Threshold cases add credential and distinctness evidence; the tables report encoded proof-element sizes separately from computation time.")
+    text = f"""# Evaluation of ledger-enforced public credential guards
+
+{mode}. This evaluation answers four questions about the implemented public-guard subset. It combines functional scenarios, bounded semantic checks and measured proof/EVM costs under the documented trust assumptions.
 
 ## Method and provenance
 
@@ -142,13 +162,13 @@ Measurements come from [source revision {revision[:7]}](https://github.com/csill
 
 Each proof case has one warm-up and three paired generation/verification samples. Tables report mean and observed minimum–maximum, not confidence intervals. Cryptographic keys, IDs and blinding are fresh OS randomness. Formula sampling uses seed 2026, depth at most four, and a universe of four IDs. Every comparable state pair is enumerated for each sampled formula; the formula space itself is not exhaustively enumerated.
 
-## RQ1: Does atomic CAS prevent the demonstrated stale-guard race?
+## RQ1: Does ledger evaluation prevent the demonstrated false-guard update?
 
-**Within the selected trust model, yes for the tested interleaving.** Alice and Bob obtain valid guards at the same state. The naive updater checks both and later revokes both credentials, yielding two reservations. With the policy bound to the action, Alice's update succeeds and Bob's update reverts with `StaleGroupVersion`. Bob's old presentation remains cryptographically valid but is no longer fresh. The stable "flat is taken" proof remains valid after a later issuance and revocation. A separate holder proof verifies signature, group membership and revoked status without naming the group member in the proof interface.
+**Yes for the tested public reservation policy and interleaving.** Alice and Bob obtain valid guards at the same state. The naive updater checks both and later revokes both credentials, yielding two reservations. With the policy bound to the action, Alice's update succeeds and Bob's update reverts with `GuardFalse`. Bob's old presentation remains cryptographically valid but is no longer fresh. The reservation's stable "flat is taken" proof remains valid after later issuance. A separate fixture verifies a stable proof after actual later issuance and revocation in that proof's registry. A separate holder proof verifies signature, group membership and revoked status without naming the group member in the proof interface.
 
-The result is a controlled sequential interleaving of a check/use race, not a throughput or many-client concurrency experiment. It does not establish end-to-end anonymity. The issuer is trusted to verify the proof and select a correct classification and bindings; CAS closes the freshness gap after that verification. A dishonest issuer can submit a hash without a valid guard in this reduced design.
+The result is a controlled sequential interleaving of a check/use race, not a throughput or many-client concurrency experiment. It does not establish end-to-end anonymity. The contract evaluates the registered public program at execution. A bound update policy cannot be removed or replaced. Unsupported private presented guards are rejected on binding and execution, rather than accepted on the strength of a hash or retrospective proof check. The event proof is available for independent audit, but public guard truth is determined by ledger counters. Policy authors choose the initial program; enforcement does not establish that it represents an external agreement or the descriptive query string.
 
-The [correctness cases]({relatives}/correctness.csv), [BDD outcomes]({relatives}/bdd.json) and [reservation trace]({relatives}/reservation.json) record the observations. Robustness evidence covers malformed accumulator updates, stale values, repeated revocation, invalid groups, policy mismatch, bypass attempts, guard-proof validation, CAS coverage and invalid history versions through the contract, actor and unit suites. [Robustness results]({relatives}/robustness.csv) and [actor integration output]({relatives}/guard-integration.tap) retain the run evidence. This is functional rejection coverage, not a denial-of-service assessment.
+The [correctness cases]({relatives}/correctness.csv), [BDD outcomes]({relatives}/bdd.json) and [reservation trace]({relatives}/reservation.json) record the observations. Robustness evidence covers duplicate issuance, unissued revocation despite a forged quotient witness, invalid group membership, false public guards, policy replacement/removal, unsupported private guards, malformed policy programs and proof-event integrity through the contract, actor and unit suites. [Robustness results]({relatives}/robustness.csv) and [actor integration output]({relatives}/guard-integration.tap) retain the run evidence. This is functional rejection coverage, not a denial-of-service assessment.
 
 ## RQ2: Is the classifier sound on the bounded sample, and how conservative is it?
 
@@ -158,9 +178,9 @@ The [correctness cases]({relatives}/correctness.csv), [BDD outcomes]({relatives}
 
 ![Conservative volatile classifications](classification.svg)
 
-These conservative verdicts can request stronger freshness checking than the bounded semantics require. They are not false soundness claims: the syntactic rule deliberately over-approximates volatility. The percentages describe this generator and finite state space, not a representative production workload or a measured transaction-rejection rate. [Raw classification counts]({relatives}/classification.csv).
+These conservative verdicts can request stronger off-chain presentation freshness checking than the bounded semantics require. Public update guards are evaluated directly and do not depend on this classifier to establish guard truth. They are not false soundness claims: the syntactic rule deliberately over-approximates volatility. The percentages describe this generator and finite state space, not a representative production workload or a measured transaction-rejection rate. [Raw classification counts]({relatives}/classification.csv).
 
-The separate Lean model provides ideal set-level proofs. Its exact-check and guard-truth premises are not enforced against a malicious issuer by the reduced Solidity implementation; no end-to-end compiler or cryptographic proof is inferred from those theorems.
+The separate Lean model provides ideal set-level proofs. The implementation now supplies structural lifecycle checks and actual public guard evaluation. The model is still not a refinement proof of Solidity or the compiler, and no end-to-end cryptographic or privacy proof is inferred from its theorems.
 
 ## RQ3: How do proof costs change with the threshold and anchored group size?
 
@@ -186,7 +206,7 @@ Three samples on one shared host support a description of these runs, not a prec
 
 ## RQ4: What are the EVM execution and calldata costs?
 
-**Group creation gets more expensive over the tested sizes.** It computes and checks a set-polynomial relation; a fixed number of pairing checks does not make total execution cost constant.
+**Group creation gets more expensive over the tested sizes.** It checks that each public member ID was issued and stores the fixed member list. Storage and per-member checks explain why this path is not constant-cost.
 
 ![Group-creation gas](group-gas.svg)
 
@@ -200,7 +220,15 @@ Group creation uses SRS degree 16 for every size shown. Each row above is one tr
 |---|---|---:|---:|
 {action_table}
 
-The update rows establish that each path executes and records its cost. They do **not** isolate CAS overhead: the operations occur at different storage states, and gas depends on zero/nonzero transitions and calldata contents. In particular, a lower measured cost for a stable guarded update than an unguarded update is not evidence that guarding saves gas. A controlled overhead experiment would reset to identical pre-state and vary only the policy/check path.
+The three control rows restore the same Anvil snapshot before revoking the same ID with the same accumulator update. All policies exist before the snapshot. The action is deliberately unbound so that the bare path can execute. This compares total optional public-guard call cost, including policy lookup, public evaluation, proof bytes and events; it does not isolate a single EVM opcode or establish a universal overhead. The permanently bound rows are separate functional measurements.
+
+![Controlled public-guard cost](guard-overhead.svg)
+
+| Control path | Gas | Difference from bare update |
+|---|---:|---:|
+{overhead_table}
+
+Each control path is measured once. Proof payloads differ between public group and whole-registry queries, and these payload differences are part of the measured call cost. These are public evaluation paths, not the older reduced design's CAS modes.
 
 Calldata bytes include the selector and arguments. These are local Prague gas measurements, not OP Sepolia L1 data fees, currency costs, finality latency or throughput. [Per-transaction gas and calldata]({relatives}/gas.csv).
 
@@ -208,7 +236,7 @@ Calldata bytes include the selector and arguments. These are local Prague gas me
 
 `just reproduce` runs the measurements on a fresh local chain and derives this evaluation under `out/evaluation/`. `just figures results/local out/evaluation` derives the text and figures from the committed full run without rerunning the measurements. The renderer verifies every recorded output hash before interpreting the CSVs. Smoke output is marked as reduced and must not replace the full-workload evaluation.
 
-The evidence supports the implemented conditional race-prevention mechanism, bounded classification checks and the measured proof/EVM costs. It does not support malicious-issuer safety, general classifier soundness from sampling alone, production throughput, full anonymity, or current public-testnet performance. The broader paper evaluation chapter and new live deployment are outside this companion-repository task.
+The evidence supports structural lifecycle checks, ledger-enforced public guards under a permanently bound policy, bounded classification checks and the measured proof/EVM costs. Private guard enforcement is not implemented: those update policies fail closed. Off-chain private status proofs retain their trapdoor-holder limitation. The evidence does not establish general classifier soundness from sampling alone, production throughput, full anonymity, or current public-testnet performance. The broader paper evaluation chapter and new live deployment are outside this companion-repository task.
 """
     (out / "evaluation.md").write_text(text)
     derived = {"measurementRevision": revision, "smoke": provenance["smoke"],
