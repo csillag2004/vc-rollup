@@ -12,4 +12,5 @@ jobs:
       - name: Secrets (gitleaks)
         run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.0 git /repo --redact --verbose --config /repo/scripts/gitleaks.toml
       - name: Links, paths, paper sources, agent identities and files
+        if: always()
         run: python3 scripts/hygiene.py
