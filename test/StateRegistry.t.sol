@@ -1041,4 +1041,127 @@ contract StateRegistryTest is Test {
         vm.expectRevert(abi.encodeWithSelector(StateRegistry.NotIssuer.selector, credDefId, caller));
         registry.revoke(regId, bytes32(Y1), a, r, w);
     }
+
+    // ------------------------------------------------------------ a Lean-modell tanúi és ellenpéldái
+    // verification/lean (lean-lifecycle-spec): Witnesses.lean és Necessity.lean; a megfeleltetés: design/LEAN-TESTS.md
+
+    /// unguarded_race: policy nélkül egy csoport két tagja is visszavonható, ezért kell a foglalás policyja
+    function test_unguardedRaceRevokesTwoMembers() public {
+        _issue(Y1);
+        _issue(Y2);
+        bytes32 g = _createGroup(LABEL, _members(Y1, Y2));
+        _revoke(Y1);
+        _revoke(Y2);
+        assertTrue(registry.isRevoked(regId, bytes32(Y1)));
+        assertTrue(registry.isRevoked(regId, bytes32(Y2)));
+        assertEq(registry.groupVersion(g), 2);
+    }
+
+    /// one_reservation: a foglalás policyja alatt a csoport egy tagja visszavonható, a korlát elérhető
+    function test_oneReservationReachesBound() public {
+        _issue(Y1);
+        bytes32[] memory m = new bytes32[](1);
+        m[0] = bytes32(Y1);
+        bytes32 g = _createGroup(LABEL, m);
+        bytes32 p = _reservationPolicy(g);
+        _bindTo(PolicyRegistry.Action.Revoke, p);
+        _guardedRevoke(Y1, _guard(p, 1));
+        assertTrue(registry.isRevoked(regId, bytes32(Y1)));
+        assertEq(registry.groupVersion(g), 1);
+    }
+
+    /// S = {Y1, Y2}, Y3 kívül; a kötött foglalási policy guardja a v versionnél. Ugyanabban az állapotban
+    /// Y1 és Y2 foglalása is elfogadható (mindkettőt kipróbáljuk, majd visszaállunk).
+    function _reservationScene() internal returns (bytes32 p, StateRegistry.Guard memory gd) {
+        _issue(Y1);
+        _issue(Y2);
+        _issue(Y3);
+        p = _reservationPolicy(_createGroup(LABEL, _members(Y1, Y2)));
+        _bindTo(PolicyRegistry.Action.Revoke, p);
+        (,,,, uint64 v) = registry.getValues(regId);
+        gd = _guard(p, v);
+        uint256 snap = vm.snapshotState();
+        _guardedRevoke(Y1, gd);
+        vm.revertToState(snap);
+        _guardedRevoke(Y2, gd);
+        vm.revertToState(snap);
+    }
+
+    /// both_rejected, megfordítva. A Lean-modellben a csoportba eső kiadás után mindkét, ugyanarra az állapotra
+    /// bizonyított foglalás elbukik, pedig a guard igaz. Itt a csoport fix és csak kiadott ID-ket tartalmaz, a
+    /// csoport-klózt pedig a contract végrehajtáskor értékeli ki: a közbeékelt kiadás után az első foglalás a korábban
+    /// bizonyított guarddal is átmegy (friss értékekkel), a második elbukik. Pontosan egy sikerül.
+    function test_reservationSurvivesInterleavedIssuance() public {
+        (bytes32 p, StateRegistry.Guard memory gd) = _reservationScene();
+        _issue(Y4);
+        _guardedRevoke(Y1, gd);
+        _expectGuardedRevokeReverts(Y2, gd, abi.encodeWithSelector(StateRegistry.GuardFalse.selector, p));
+    }
+
+    /// both_rejected, megfordítva: ugyanez egy S-en kívüli visszavonás után (a kötött policy miatt az is guardolt)
+    function test_reservationSurvivesOutsideRevocation() public {
+        (bytes32 p, StateRegistry.Guard memory gd) = _reservationScene();
+        _guardedRevoke(Y3, gd);
+        _guardedRevoke(Y1, gd);
+        _expectGuardedRevokeReverts(Y2, gd, abi.encodeWithSelector(StateRegistry.GuardFalse.selector, p));
+    }
+
+    /// stale_values: a Lean-tanú egy kiadás. Egy korábbi állapotból számolt, ott helyes kiadási értékeket a lépés-
+    /// ellenőrzés elutasít, verzió-ellenőrzés nélkül.
+    function test_issueStaleValuesReverts() public {
+        _issue(Y1);
+        (bytes memory i, bytes memory w) = _issueValues(Y3); // az 1. version állapotából
+        _issue(Y2);
+        vm.prank(alice);
+        vm.expectRevert(StateRegistry.StepCheckFailed.selector);
+        registry.issueUpdate(regId, bytes32(Y3), i, w);
+    }
+
+    /// issue_check_needed: Y2 kiadása I' = {Y2} értékkel, Y1 kiesne I-ből. A részhalmaz-ellenőrzés átengedné, a lépés nem.
+    function test_issueDroppingIssuedReverts() public {
+        _issue(Y1);
+        bytes memory i = BLS.g1Mul(BLS.g1(), addmod(Y2, ALPHA, BLS.R));
+        assertTrue(BLS.pairingEq(i, curR, i, BLS.g2())); // W_IR' = I', mert R̃ = g̃
+        vm.prank(alice);
+        vm.expectRevert(StateRegistry.StepCheckFailed.selector);
+        registry.issueUpdate(regId, bytes32(Y2), i, i);
+    }
+
+    /// step_check_needed: visszavonás, amely a korábbi visszavonást kiejti R̃-ból. A Lean-ellenpélda szó szerint
+    /// (Y1 újra, a kezdeti A és R̃ értékkel) itt már a tárolón elbukik; Y2 visszavonása {Y2} visszavont halmazzal
+    /// átmegy a konzisztencián és a részhalmazon, a lépés-ellenőrzés utasítja el.
+    function test_revokeDroppingRevokedReverts() public {
+        _issue(Y1);
+        _issue(Y2);
+        _revoke(Y1);
+        bytes memory v0 = _v0();
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(StateRegistry.AlreadyRevoked.selector, bytes32(Y1)));
+        registry.revoke(regId, bytes32(Y1), v0, BLS.g2(), curI);
+
+        uint256 f = addmod(Y2, ALPHA, BLS.R);
+        bytes memory a = BLS.g1Mul(v0, BLS.frInv(f));
+        bytes memory r = BLS.g2Mul(BLS.g2(), f);
+        bytes memory w = BLS.g1Mul(BLS.g1(), addmod(Y1, ALPHA, BLS.R));
+        assertTrue(BLS.pairingEq(a, r, _v0(), BLS.g2()));
+        assertTrue(BLS.pairingEq(w, r, curI, BLS.g2()));
+        vm.prank(alice);
+        vm.expectRevert(StateRegistry.StepCheckFailed.selector);
+        registry.revoke(regId, bytes32(Y2), a, r, w);
+    }
+
+    /// consistency_check_needed: Y1 visszavonása R̃' = {Y1, Y2} értékkel, Y2 egyszerre lenne R̃-ban és A-ban.
+    /// A lépés és a részhalmaz teljesül, a konzisztencia-ellenőrzés utasítja el.
+    function test_revokeExtraIdInRtildeReverts() public {
+        _issue(Y1);
+        _issue(Y2);
+        (bytes memory a,,) = _revokeValues(Y1);
+        uint256 p = mulmod(addmod(Y1, ALPHA, BLS.R), addmod(Y2, ALPHA, BLS.R), BLS.R);
+        bytes memory r = BLS.g2Mul(BLS.g2(), p);
+        bytes memory w = BLS.g1(); // W_IR' = g^(P_Iss/P_Rev') = g
+        assertTrue(BLS.pairingEq(w, r, curI, BLS.g2()));
+        vm.prank(alice);
+        vm.expectRevert(StateRegistry.ConsistencyCheckFailed.selector);
+        registry.revoke(regId, bytes32(Y1), a, r, w);
+    }
 }
