@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "implementationProfile": "public-guards-v1",
+  "mode": "reproduce",
+  "smoke": false,
+  "network": {
+    "target": "anvil",
+    "chainId": 31337
+  },
+  "success": true,
+  "error": null,
+  "startedAt": "2026-10-31T19:12:30.916Z",
+  "finishedAt": "2026-10-31T19:14:29.183Z",
+  "elapsedSeconds": 118.267,
+  "revision": "a2d0cf26823917e767e55532bd240819608fc29e",
+  "dirty": "",
+  "platform": {
+    "os": "linux",
+    "release": "7.2.8-9-omarchy",
+    "architecture": "x64",
+    "cpu": "AMD Ryzen 9 7950X3D 16-Core Processor",
+    "logicalCpus": 32,
+    "totalMemoryBytes": 100830253056
+  },
+  "tools": {
+    "node": "v26.7.0",
+    "forge": "forge Version: 1.8.6\nCommit SHA: 6bad0a66de7c83f7b33695044138f0f5fa4c5990\nBuild Timestamp: 2026-10-21T17:56:11.890310850Z (1792605371)\nBuild Profile: dist",
+    "anvil": "anvil Version: 1.8.6\nCommit SHA: 6bad0a66de7c83f7b33695044138f0f5fa4c5990\nBuild Timestamp: 2026-10-21T17:56:11.890310850Z (1792605371)\nBuild Profile: dist",
+    "solc": "solc, the solidity compiler commandline interface\nVersion: 0.8.30+commit.73712a01.Linux.g++"
+  },
+  "parameters": {
+    "hardfork": "prague",
+    "classificationSeed": 2026,
+    "formulasPerModel": 3000,
+    "universeSize": 4,
+    "maxFormulaDepth": 4,
+    "proofWarmups": 1,
+    "proofSamples": 3,
+    "groupSizes": [
+      4,
+      16,
+      64
+    ],
+    "cryptoRandomness": "OS CSPRNG; fresh keys, IDs and proof blinding each run"
+  },
+  "sha256": {
+    "classification.csv": "fbfcb55f86805567eeb5e3e573210578a59a3671e5d4439fc8c112bbc4e6d8c2",
+    "bdd.log": "a90b3c40eb6d6eb55afd7c4745c9d29b3870221649fc0aec64634432352592a0",
+    "bdd.json": "c2efc76ced1b96caa89e781ec788f79324fe4217ad2ff5c340aff57ad188a396",
+    "correctness.csv": "2d2e71d9f38cf8427d25a23b873a913740b6fb0dfba305b3a3be8e345831bc2b",
+    "reservation.json": "9e7e06fb80abb797d4f7b2b03bbbd4c30d0411f434434a9f1370f33b7bfed877",
+    "scalability.csv": "0fcddd4e457e68675cecb9e2ba275cebc5c95c73ecd1987a79c9383197d7ceeb",
+    "gas.csv": "257330c024517b06f258cc2dcbbde66705127b543bb34c1f3eb467cedc4e551b",
+    "robustness-forge.json": "e8b2825be5d620743fbdfbc6a96f199b301d317705af8bdf09954be0998c3e6c",
+    "guard-integration.tap": "6afb3278846e13628b14c38b1a8977b6b2fd3a824242eb9656f83dec9f06a1c4",
+    "robustness.csv": "8bba439e43ee2884b6b3186e8365665305e3aad0e0e75debb5734e42a41eb9ef",
+    "reproduce-report.md": "03f33bd11065d2746145caaa5ff9de5b2d0ef6bb6f7d8fec2f117e235161eb64",
+    "report.md": "03f33bd11065d2746145caaa5ff9de5b2d0ef6bb6f7d8fec2f117e235161eb64"
+  }
+}

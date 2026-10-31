@@ -1,0 +1,18 @@
+{
+  "measurementRevision": "a2d0cf26823917e767e55532bd240819608fc29e",
+  "smoke": false,
+  "inputProvenanceSha256": "1572f704e36900d84a522f69055834710e375411fcbf0d89b9fba75f301a79dc",
+  "rendererSha256": "ff0ee7238c7f48143b14d5e3600002dcde05f2a1ad86f563dc2182cff8703445",
+  "matplotlib": "3.10.7",
+  "outputs": {
+    "classification.png": "d8ba432f4e7aa535e563e8b072fe80dfb577b80afc217f604aecf8e4c9ec9df2",
+    "classification.svg": "36634e900c5272107b18019d9952f3857b59c344fd599d8b5ab3de9d5c0c0d73",
+    "evaluation.md": "da28eefc9320a5dddb1cf6a9b97dc8cda214e4acff0672e11eff8b90fcdd17e3",
+    "group-gas.png": "f63be592991b434dc767c778020b09bd7ffdb01a1dde720b98e063b6cddb925d",
+    "group-gas.svg": "69ebb1343410ef4e57574dd40c05942b75510506421512c8f1c917b2d41e25f4",
+    "guard-overhead.png": "42ab0a25b910e8f3e455212bf4f035933126908f555de8b9bc2965686d8ddb20",
+    "guard-overhead.svg": "ea45a150e154b9f16687eabdb0b923b1a851f6dfaf792789ef8b411285acd22f",
+    "proof-cost.png": "a765da70b85b143e8c7405f63f4f30559bedbd594cc620adb2cc65aa69c6aeae",
+    "proof-cost.svg": "9818099818f3703b08eb28c4b87a036d393daf163d634aaa16ea14f7f65197f7"
+  }
+}

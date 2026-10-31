@@ -144,7 +144,14 @@ def main():
     ax.set(ylabel="Gas (thousands)", title="Update paths from an identical snapshotted state")
     ax.grid(axis="y", alpha=.2)
     save(fig, "guard-overhead")
-    scaling_answer = ("**Smoke data are a pipeline check, not a scaling evaluation.** Use a full run for the conclusions and dimensions below." if provenance["smoke"] else "**Both tested dimensions increase computation, while they affect proof size differently.** Requiring more active credentials adds credential and distinctness evidence. Hidden membership in a larger anchored group keeps the measured encoded proof size fixed while increasing the measured work.")
+    def timing_trend(cases, column):
+        means = [statistics.mean(float(row[column]) for row in samples) for _, samples in sorted(cases.items())]
+        return "increases at every tested size" if all(a < b for a, b in zip(means, means[1:])) else "does not increase monotonically across the tested sizes"
+
+    scaling_answer = ("**Smoke data are a pipeline check, not a scaling evaluation.** Use a full run for the conclusions and dimensions below." if provenance["smoke"] else
+        f"For the threshold cases, mean generation time {timing_trend(thresholds, 'prove_ms')} and mean verification time {timing_trend(thresholds, 'verify_ms')}. "
+        f"For the hidden group-member cases, mean generation time {timing_trend(groups, 'prove_ms')} and mean verification time {timing_trend(groups, 'verify_ms')}. "
+        "The sample ranges show measurement variability. Threshold cases add credential and distinctness evidence; the tables report encoded proof-element sizes separately from computation time.")
     text = f"""# Evaluation of ledger-enforced public credential guards
 
 {mode}. This evaluation answers four questions about the implemented public-guard subset. It combines functional scenarios, bounded semantic checks and measured proof/EVM costs under the documented trust assumptions.
