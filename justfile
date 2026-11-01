@@ -43,9 +43,9 @@ lean:
 hygiene *args:
     python3 scripts/hygiene.py {{args}}
 
-# Known historical exposures remain a release blocker; --strict reports them.
-secrets *args:
-    bash scripts/secrets.sh {{args}}
+# Secrets in the whole history; fails until the leaked keys are removed from history.
+secrets:
+    docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.0 git /repo --redact --config /repo/scripts/gitleaks.toml
 
 # Interpret a hash-verified run and render its publication figures.
 figures input="out" output="out/evaluation":

@@ -1,4 +1,0 @@
-# Known historical exposures. Each remains a blocker for just secrets --strict.
-e37175d04c8cae2fc3e36fef6c8b8a3758e28e0f:wallets.txt:generic-api-key:11
-7e41dd034fb095a6bc2591352a8df217c3591443:wallets.txt:generic-api-key:3
-7e41dd034fb095a6bc2591352a8df217c3591443:wallets.txt:generic-api-key:7

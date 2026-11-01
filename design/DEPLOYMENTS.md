@@ -26,3 +26,12 @@ Explorer: `https://sepolia-optimism.etherscan.io/address/<address>`. The contrac
 
 The flat reservation was run against these contracts: [`OP-SEPOLIA-RUN.md`](OP-SEPOLIA-RUN.md) (outcome, gas and
 fees per operation, every transaction). Addresses for the off-chain client: `deployments/11155420.json`.
+
+## Earlier: Scroll Sepolia
+
+Before the move to OP Stack, only the DID registry was deployed on Scroll Sepolia (recorded 2026-04-13).
+Nothing in the current code uses it.
+
+| Contract | Address | Transaction | Block | Cost |
+|---|---|---|---:|---|
+| EthereumDIDRegistry | `0x6fc2bA5f13495EAdBA6a87881d0aD67134e4fCa8` | `0x8eebdfb1f1f8dfa05b96058abca0c50033c8a225c99a7c4406be94cad51a4a83` | 17,430,992 | 0.0000318 ETH (2,029,263 gas at 0.0157 gwei) |

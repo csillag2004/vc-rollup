@@ -6,18 +6,18 @@ The current artifact is prepared for review. A public release or Zenodo deposit 
 
 The full-history gitleaks scan found three private-key entries in `wallets.txt` that are not the standard Anvil test accounts. This revision removes the file. Deletion does not remove the keys from earlier commits or invalidate them.
 
-`scripts/gitleaks-history-baseline.txt` records only the three historical finding fingerprints. Normal CI uses that narrow baseline so a new exposure still fails. The standard public Anvil account-zero key has a separate exact allowlist entry. Neither mechanism means that the exposed keys are safe.
+The hygiene workflow scans the whole history with gitleaks and has no baseline for these keys, so it fails until the history is rewritten. The only allowlist entry, in `scripts/gitleaks.toml`, is the standard public Anvil account-zero key used by the local test fixtures.
 
-Before publication, the owner must determine where the three keys were used, retire or rotate them, and decide how to handle affected assets or accounts. A coordinated history rewrite, including affected branches and tags, requires a separate decision. This PR does not rewrite shared history or transact on a live network.
+Before publication, the owner must determine where the three keys were used, retire or rotate them, and decide how to handle affected assets or accounts. A coordinated history rewrite, including affected branches and tags, requires a separate decision. This repository does not rewrite shared history or transact on a live network.
 
 Run both publication gates after remediation:
 
 ```sh
-just secrets --strict
+just secrets
 just hygiene --strict
 ```
 
-The strict secrets gate deliberately ignores the historical baseline and currently fails. The strict hygiene gate also reports historical private-paper links. One citation inside the sealed Lean contract remains a documented source-record exception; changing it would invalidate the original seal. Any publication treatment of that record must preserve a verifiable original and identify the redaction explicitly.
+The strict hygiene gate also reports the private-paper links in earlier revisions of `verification/lean/CONTRACT.md` and `PAPER-COVERAGE.md`. The current `CONTRACT.md` names the paper source as plain text and is resealed; `verification/lean/README.md` records the original seal and the exact change.
 
 ## Testnet preparation
 

@@ -80,7 +80,7 @@ The race demonstrates prevention of a second reservation by current-state public
 
 The [current claim-to-evidence map](design/CLAIM-EVIDENCE.md) separates contract enforcement, model assumptions and unsupported private guards. Private presentations remain available off-chain under their documented assumptions. Proof bytes emitted for public updates are audit data; they do not authorize the transition.
 
-[Historical evaluation](design/EVALUATION.md) and [OP Sepolia evidence](design/OP-SEPOLIA-RUN.md) retain their provenance. No new deployment or live performance claim is made. [Thesis changes](design/THESIS-CHANGES.md) list required alignment without editing the paper.
+[Historical evaluation](design/EVALUATION.md) and [OP Sepolia evidence](design/OP-SEPOLIA-RUN.md) retain their provenance. Local reproduction does not redeploy contracts or establish current testnet performance.
 
 ## Contributions
 
