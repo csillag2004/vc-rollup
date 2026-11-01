@@ -1,23 +1,14 @@
 # Release status
 
-The current artifact is prepared for review. A public release or Zenodo deposit remains blocked by historical credential exposure.
+The current artifact is prepared for review. A public release or Zenodo deposit waits until the three leaked keys below are rotated.
 
 ## Historical keys
 
-The full-history gitleaks scan found three private-key entries in `wallets.txt` that are not the standard Anvil test accounts. This revision removes the file. Deletion does not remove the keys from earlier commits or invalidate them.
+The full-history gitleaks scan finds three private-key entries in `wallets.txt` (commits `7e41dd0` and `e37175d`). They are not Anvil test accounts. The file is gone from the tree, but the history is not rewritten, so the keys stay readable once the repository is public. The fix is to rotate them: new wallets, and nothing left on the old ones.
 
-The hygiene workflow scans the whole history with gitleaks and has no baseline for these keys, so it fails until the history is rewritten. The only allowlist entry, in `scripts/gitleaks.toml`, is the standard public Anvil account-zero key used by the local test fixtures.
+Until then the hygiene workflow's gitleaks step fails. After rotation, their fingerprints go into `.gitleaksignore` under a comment that says when they were rotated. The three entries already there are the public Anvil account-zero key used by the local test fixtures.
 
-Before publication, the owner must determine where the three keys were used, retire or rotate them, and decide how to handle affected assets or accounts. A coordinated history rewrite, including affected branches and tags, requires a separate decision. This repository does not rewrite shared history or transact on a live network.
-
-Run both publication gates after remediation:
-
-```sh
-just secrets
-just hygiene --strict
-```
-
-The strict hygiene gate also reports the private-paper links in earlier revisions of `verification/lean/CONTRACT.md` and `PAPER-COVERAGE.md`. The current `CONTRACT.md` names the paper source as plain text and is resealed; `verification/lean/README.md` records the original seal and the exact change.
+Run the scan locally with `just secrets`, and the publication gate with `just hygiene --publish`. Its history warnings include the private-paper links in earlier revisions of `verification/lean/CONTRACT.md` and `PAPER-COVERAGE.md`. The current `CONTRACT.md` names the paper source as plain text and is resealed; `verification/lean/README.md` records the original seal and the exact change.
 
 ## Testnet preparation
 
