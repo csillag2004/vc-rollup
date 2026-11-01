@@ -1,8 +1,18 @@
 # vc-rollup
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.TODO.svg)](https://doi.org/10.5281/zenodo.TODO)
+
 Companion artifact for *Joint anonymized issuance and revocation for complex verifiable credential chains* by Kocsis Csillag Kamilla (2026).
 
 This prototype combines BBS credentials, a query language, three BLS12-381 accumulators and ledger-enforced public guards on an EVM with EIP-2537. Issuance publishes IDs; storage enforces lifecycle and group membership. The contract evaluates bound public guards at execution, and update policies cannot be removed or replaced. Private update guards are rejected because the existing proof construction is unsound against the accumulator trapdoor holder. See [the executable contract](design/ENFORCED-GUARDS.md).
+
+## Reproduce everything
+
+```sh
+docker run --rm -v "$PWD/out:/out" -e OUT=/out ghcr.io/csillag2004/vc-rollup:v1.0.0 reproduce
+```
+
+This regenerates every result below into `out/` from the results-tag image. Add `--smoke` for a reduced run. With the repository cloned and the dependencies below installed, `just reproduce` does the same; CI runs `just reproduce --smoke` in the container on every push.
 
 ## Setup
 
@@ -35,23 +45,25 @@ docker build --build-arg ARTIFACT_REVISION=$(git rev-parse HEAD) -t vc-rollup-ar
 docker run --rm -v "$PWD/out-container:/out" -e OUT=/out vc-rollup-artifact reproduce --smoke
 ```
 
-Omit `--smoke` for full measurements. No container image or release tag has been published.
+Omit `--smoke` for full measurements. The release workflow publishes the same image as `ghcr.io/csillag2004/vc-rollup:<tag>` for every release.
 
 ## What does not reproduce
 
 The local recipes do not recreate historical OP Sepolia transactions, perform a deployment, or populate the separate thesis sources. Cryptographic keys, IDs and proof blinding use OS randomness. The formula sampler uses seed 2026; CPU timings and some encoded proof lengths vary between runs. Lean verifies an ideal model, not the Solidity implementation or the cryptographic assumptions.
 
-## Results and release
+## Results tag
 
-The paper's evaluation chapter is still a skeleton, so this repository does not invent table numbers or a results tag. Current measurements must identify their source revision through provenance. Publication remains blocked by [historical key exposure](design/SECURITY-RELEASE.md); `just secrets --strict` is deliberately stricter than the CI baseline. A PR is not a release or a Zenodo deposit.
+The paper's numbers come from tag `v1.0.0` and its Zenodo version 1.0.0. Later versions change the packaging, never the results. Each run's provenance names the source revision it measured. Three keys leaked in the history of `wallets.txt`; see [release status](design/SECURITY-RELEASE.md).
 
 ## Evaluation
 
 The [written evaluation](results/evaluation/evaluation.md) states four research questions, interprets the correctness, classification, proof-cost and EVM results, and bounds the claims. Its figures and tables are derived from the recorded CSVs, with hashes checked first. `just reproduce` generates both measurements and evaluation; `just figures results/local out/evaluation` rebuilds the interpretation and figures from the committed run. Matplotlib and its dependencies are pinned in `scripts/evaluation-requirements.txt`.
 
-## Recorded results
+## Results map
 
 [Current local report](results/local/report.md), [provenance](results/local/provenance.json), and [demo recording](results/demo/demo.cast) identify the evaluated source revision and machine. Earlier reduced-design measurements are retained under [historical/reduced](results/historical/reduced/VALIDATION.md); their numbers and guarantees do not describe this ABI. Timings were taken on a shared development host without CPU isolation.
+
+The paper's evaluation chapter has no numbered figures or tables yet, so each row names the result it supports.
 
 | Evidence | Recipe | Output |
 |---|---|---|
@@ -63,7 +75,7 @@ The [written evaluation](results/evaluation/evaluation.md) states four research 
 | Complete run and parameters | `just reproduce` | `out/report.md`, `out/provenance.json` |
 | Recorded terminal demonstration | `just demo` | `out/demo/demo.cast`, captions and transcript |
 
-See [validation and remaining release work](results/VALIDATION.md). Re-running a recipe overwrites its outputs; use `OUT` to keep separate runs.
+A full `just reproduce` took 118 s on an AMD Ryzen 9 7950X3D (32 threads, 94 GiB, Linux x86-64), as recorded in [provenance](results/local/provenance.json). See [validation and remaining release work](results/VALIDATION.md). Re-running a recipe overwrites its outputs; use `OUT` to keep separate runs.
 
 ## Evidence and scope
 
@@ -88,4 +100,4 @@ The paper is by Kocsis Csillag Kamilla. The companion includes work by Kamilla a
 
 ## Citation and license
 
-Citation metadata is in [CITATION.cff](CITATION.cff). No DOI or release identifier is assigned here. Original repository code is offered under the [MIT license](LICENSE); vendored dependencies retain their own licenses, including those under `lib/`.
+Cite the paper and this artifact's concept DOI (the badge above); the metadata is in [CITATION.cff](CITATION.cff). Original repository code is offered under the [MIT license](LICENSE); vendored dependencies retain their own licenses, including those under `lib/`.

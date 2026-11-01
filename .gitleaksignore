@@ -1,0 +1,4 @@
+# The public Anvil account-zero test key from Foundry's documentation; it only funds the local chain.
+a76d0449aefb2b4b775c05948fd2927a958cd8a6:offchain/eval/classify-exhaustive.ts:generic-api-key:16
+91e50cde466b3962d8bec5fa603c939ec07962cb:offchain/features/support/world.ts:generic-api-key:11
+d775c1aa7ca95f9babf87fbf902b07800aaa22b3:offchain/eval/gas.ts:generic-api-key:7
