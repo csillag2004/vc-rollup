@@ -29,3 +29,5 @@ wallets*
 /qlc/target/
 
 .venv-evaluation/
+
+.lib/ethr-did-registry/.env.example
